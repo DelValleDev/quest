@@ -301,16 +301,17 @@ quest/
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia MIT - ver [LICENSE](./LICENSE) para más detalles.
+Este proyecto es **software propietario**. Ver [LICENSE](./LICENSE) para más detalles.
+
+**⚠️ IMPORTANTE:** Este código es solo para visualización/demostración. No está permitido copiar, modificar, distribuir o usar este software sin autorización escrita.
 
 ---
 
 ## 📞 Contacto
 
 Para preguntas, feedback o colaboración:
-- **Email**: [tu-email@ejemplo.com]
-- **Twitter**: [@tu-usuario]
-- **Discord**: [Link a servidor]
+- **Email**: samuelrestrepodev@gmail.com
+- **GitHub**: [@DelValleDev](https://github.com/DelValleDev)
 
 ---
 
