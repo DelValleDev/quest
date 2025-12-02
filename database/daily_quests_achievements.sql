@@ -3,14 +3,8 @@
 -- Run this in Supabase SQL Editor AFTER schema.sql
 -- =====================================================
 
--- =====================================================
--- DAILY QUEST POOL (50+ varied quests)
--- =====================================================
 
--- Clear existing if re-running
--- DELETE FROM public.challenges WHERE is_daily = true;
 
--- PHYSICAL DAILY QUESTS (15)
 INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, is_daily, icon) VALUES
   ('Morning Warrior', 'Do 20 push-ups when you wake up', 'physical', 'medium', 25, 6, 5, true, '💪'),
   ('Stairway to Health', 'Take the stairs instead of elevator all day', 'physical', 'easy', 15, 3, null, true, '🏃'),
@@ -28,7 +22,6 @@ INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_rew
   ('Dance Break', 'Dance for 10 minutes to your favorite music', 'physical', 'easy', 20, 5, 10, true, '💃'),
   ('Eye Rest Protocol', 'Take a screen break every 20 minutes', 'physical', 'medium', 25, 6, null, true, '👀');
 
--- MENTAL DAILY QUESTS (15)
 INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, is_daily, icon) VALUES
   ('Morning Pages', 'Write 3 pages of stream-of-consciousness', 'mental', 'medium', 30, 8, 20, true, '📝'),
   ('Puzzle Master', 'Solve a puzzle, crossword, or brain teaser', 'mental', 'easy', 20, 5, 15, true, '🧩'),
@@ -46,7 +39,6 @@ INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_rew
   ('Chess Game', 'Play a game of chess or strategy game', 'mental', 'medium', 25, 6, 15, true, '♟️'),
   ('Mindful Eating', 'Eat one meal mindfully without distractions', 'mental', 'medium', 25, 6, 20, true, '🍽️');
 
--- SOCIAL DAILY QUESTS (10)
 INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, is_daily, icon) VALUES
   ('Video Call Friend', 'Have a video call with a friend or family', 'social', 'medium', 30, 8, 15, true, '📱'),
   ('Thank You Note', 'Send a thank you message to someone', 'social', 'easy', 15, 3, 5, true, '💌'),
@@ -59,7 +51,6 @@ INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_rew
   ('Check-In', 'Ask someone how they are really doing', 'social', 'easy', 20, 5, 10, true, '❤️'),
   ('Social Media Cleanse', 'No social media for the entire day', 'social', 'hard', 50, 15, null, true, '🚫');
 
--- PROFESSIONAL DAILY QUESTS (10)
 INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, is_daily, icon) VALUES
   ('Inbox Zero', 'Clear your email inbox completely', 'professional', 'medium', 30, 8, 30, true, '📧'),
   ('Weekly Review', 'Review and plan your week ahead', 'professional', 'medium', 30, 8, 30, true, '📅'),
@@ -72,7 +63,6 @@ INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_rew
   ('Two-Minute Tasks', 'Complete all tasks that take under 2 minutes', 'professional', 'easy', 20, 5, 15, true, '⏱️'),
   ('Pomodoro Session', 'Complete 4 pomodoro work sessions', 'professional', 'hard', 50, 15, 120, true, '🍅');
 
--- SPIRITUAL DAILY QUESTS (10)
 INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, is_daily, icon) VALUES
   ('Sunrise Watch', 'Watch the sunrise mindfully', 'spiritual', 'medium', 30, 8, 15, true, '🌅'),
   ('Sunset Reflection', 'Watch the sunset and reflect on your day', 'spiritual', 'medium', 25, 6, 15, true, '🌇'),
@@ -85,7 +75,6 @@ INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_rew
   ('Declutter Mind', 'Do a brain dump - write all your thoughts', 'spiritual', 'easy', 20, 5, 15, true, '🧘'),
   ('Star Gazing', 'Spend time looking at the stars or sky', 'spiritual', 'easy', 25, 6, 15, true, '⭐');
 
--- CREATIVE DAILY QUESTS (10)
 INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, is_daily, icon) VALUES
   ('Photo of the Day', 'Take an artistic photo', 'creative', 'easy', 15, 3, 5, true, '📸'),
   ('Doodle Challenge', 'Fill a page with doodles', 'creative', 'easy', 20, 5, 15, true, '✏️'),
@@ -98,10 +87,12 @@ INSERT INTO public.challenges (title, description, pillar_id, difficulty, xp_rew
   ('Color Your World', 'Color in an adult coloring book', 'creative', 'easy', 20, 5, 20, true, '🖍️'),
   ('Idea Generation', 'Brainstorm 10 ideas for anything', 'creative', 'easy', 20, 5, 15, true, '💡');
 
--- =====================================================
--- ACHIEVEMENTS TABLE
--- Unlockable badges and achievements (100+)
--- =====================================================
+-- Ensure we have the correct achievements schema.
+-- WARNING: The following DROP statements will remove existing achievements data if present.
+-- If you need to preserve existing data, create a backup first or skip the DROP steps.
+DROP TABLE IF EXISTS public.user_achievements CASCADE;
+DROP TABLE IF EXISTS public.achievements CASCADE;
+
 CREATE TABLE IF NOT EXISTS public.achievements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   
@@ -132,7 +123,6 @@ CREATE TABLE IF NOT EXISTS public.achievements (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- USER ACHIEVEMENTS TABLE
 CREATE TABLE IF NOT EXISTS public.user_achievements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -144,10 +134,8 @@ CREATE TABLE IF NOT EXISTS public.user_achievements (
 );
 
 -- =====================================================
--- ACHIEVEMENTS DATA (100+)
--- =====================================================
-
 -- STREAK ACHIEVEMENTS (15)
+-- =====================================================
 INSERT INTO public.achievements (name, description, category, requirement_type, requirement_value, icon, rarity, order_index) VALUES
   ('First Flame', 'Complete your first day', 'streak', 'streak_days', 1, '🔥', 'common', 1),
   ('Warm Up', 'Maintain a 3-day streak', 'streak', 'streak_days', 3, '🔥', 'common', 2),
@@ -161,11 +149,13 @@ INSERT INTO public.achievements (name, description, category, requirement_type, 
   ('Year Master', 'Maintain a 365-day streak', 'streak', 'streak_days', 365, '👑', 'legendary', 10),
   ('Weekend Warrior', 'Complete quests on 4 consecutive weekends', 'streak', 'weekend_streak', 4, '📅', 'uncommon', 11),
   ('Early Riser', 'Complete morning quests 7 days in a row', 'streak', 'morning_streak', 7, '🌅', 'uncommon', 12),
-  ('Night Owl', 'Complete evening quests 7 days in a row', 'streak', 'evening_streak', 7, '🌙', 'uncommon', 13),
+  ('Night Owl Pro', 'Complete evening quests 7 days in a row', 'streak', 'evening_streak', 7, '🌙', 'uncommon', 13),
   ('Consistent', 'No missed days in a month', 'streak', 'perfect_month', 1, '✅', 'rare', 14),
   ('Unstoppable', 'Maintain a 500-day streak', 'streak', 'streak_days', 500, '🚀', 'legendary', 15);
 
+-- =====================================================
 -- CHALLENGE COUNT ACHIEVEMENTS (15)
+-- =====================================================
 INSERT INTO public.achievements (name, description, category, requirement_type, requirement_value, icon, rarity, order_index) VALUES
   ('First Quest', 'Complete your first challenge', 'challenges', 'challenges_completed', 1, '⭐', 'common', 16),
   ('Getting Started', 'Complete 5 challenges', 'challenges', 'challenges_completed', 5, '⭐', 'common', 17),
@@ -176,7 +166,7 @@ INSERT INTO public.achievements (name, description, category, requirement_type, 
   ('Veteran', 'Complete 200 challenges', 'challenges', 'challenges_completed', 200, '🛡️', 'rare', 22),
   ('Elite', 'Complete 500 challenges', 'challenges', 'challenges_completed', 500, '🏅', 'epic', 23),
   ('Champion', 'Complete 1000 challenges', 'challenges', 'challenges_completed', 1000, '🏆', 'epic', 24),
-  ('Legendary', 'Complete 2500 challenges', 'challenges', 'challenges_completed', 2500, '👑', 'legendary', 25),
+  ('Legendary Hero', 'Complete 2500 challenges', 'challenges', 'challenges_completed', 2500, '👑', 'legendary', 25),
   ('Daily Devotee', 'Complete 50 daily quests', 'challenges', 'daily_completed', 50, '📅', 'uncommon', 26),
   ('Daily Master', 'Complete 200 daily quests', 'challenges', 'daily_completed', 200, '📅', 'rare', 27),
   ('Hard Mode', 'Complete 10 hard challenges', 'challenges', 'hard_completed', 10, '💀', 'rare', 28),
