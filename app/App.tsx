@@ -4,7 +4,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useThemeStore, useAuthStore } from './src/store';
 import { supabase } from './src/lib/supabase';
-import { WelcomeScreen, AuthScreen, HomeScreen } from './src/screens';
+import { WelcomeScreen, AuthScreen } from './src/screens';
+import { MainTabs } from './src/navigation';
+import * as Linking from 'expo-linking';
 
 const Stack = createNativeStackNavigator();
 
@@ -20,6 +22,38 @@ export default function App() {
       setIsLoading(false);
     });
 
+    // Deep link handler: parse tokens from URL hash and set Supabase session
+    const handleUrl = async (url: string | null) => {
+      if (!url) return;
+      try {
+        // URL may contain tokens in the hash (#access_token=...&refresh_token=...)
+        const parts = url.split('#');
+        const hash = parts[1] ?? '';
+        if (!hash) return;
+        const params = Object.fromEntries(new URLSearchParams(hash));
+        const access_token = params['access_token'];
+        const refresh_token = params['refresh_token'];
+        if (access_token && refresh_token) {
+          // Set session in supabase client
+          // supabase.auth.setSession exists in v2
+          await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          // update store
+          const { data } = await supabase.auth.getSession();
+          setSession(data.session);
+        }
+      } catch (e) {
+        console.warn('Deep link handling error', e);
+      }
+    };
+
+    // handle cold start
+    Linking.getInitialURL().then(handleUrl);
+    // handle when app is already open
+    const urlSub = Linking.addEventListener('url', (event: { url: string }) => handleUrl(event.url));
+
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
@@ -27,7 +61,10 @@ export default function App() {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      urlSub.remove();
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Handle navigation after welcome
@@ -53,7 +90,7 @@ export default function App() {
             {() => <AuthScreen onAuthSuccess={handleAuthSuccess} />}
           </Stack.Screen>
         ) : (
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Main" component={MainTabs} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

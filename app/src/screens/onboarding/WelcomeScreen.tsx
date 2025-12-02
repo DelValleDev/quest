@@ -30,7 +30,7 @@ const slides: OnboardingSlide[] = [
     id: 2,
     title: 'AI Coach Guides You',
     subtitle: 'Quest, your personal AI companion, creates a custom plan to become your best self.',
-    emoji: '🐉',
+    emoji: '🤖',
   },
   {
     id: 3,

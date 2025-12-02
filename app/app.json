@@ -26,5 +26,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     }
+    ,
+    "scheme": "quest"
   }
 }

@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
@@ -23,6 +24,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   
   const { mode } = useThemeStore();
   const theme = getTheme(mode);
@@ -30,6 +32,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const handleAuth = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters');
       return;
     }
 
@@ -41,20 +48,34 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           email,
           password,
         });
-        if (error) throw error;
+        if (error) {
+          if (error.message.includes('Email not confirmed')) {
+            Alert.alert(
+              '🤖 Email Not Verified',
+              'Please check your inbox and verify your email before signing in.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+          throw error;
+        }
+        onAuthSuccess();
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              app_name: 'Quest',
+              created_at: new Date().toISOString(),
+            }
+          }
         });
         if (error) throw error;
-        Alert.alert(
-          'Success!',
-          'Check your email for a confirmation link.',
-          [{ text: 'OK' }]
-        );
+        
+        // Show verification modal
+        setShowVerificationModal(true);
       }
-      onAuthSuccess();
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -68,7 +89,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.header}>
-        <Text style={styles.logo}>🐉</Text>
+        <Text style={styles.logo}>🤖</Text>
         <Text style={[styles.title, { color: theme.text }]}>
           {isLogin ? 'Welcome Back' : 'Join the Quest'}
         </Text>
@@ -131,6 +152,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Email Verification Modal */}
+      <Modal
+        visible={showVerificationModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowVerificationModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+            <Text style={styles.modalEmoji}>📧</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>
+              Check Your Email!
+            </Text>
+            <Text style={[styles.modalMessage, { color: theme.textSecondary }]}>
+              We sent a verification link to{'\n'}
+              <Text style={{ color: theme.primary, fontWeight: '600' }}>{email}</Text>
+            </Text>
+            <Text style={[styles.modalHint, { color: theme.textMuted }]}>
+              Click the link in the email to verify your account, then come back and sign in.
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: theme.primary }]}
+              onPress={() => {
+                setShowVerificationModal(false);
+                setIsLogin(true);
+                setPassword('');
+              }}
+            >
+              <Text style={styles.modalButtonText}>Got it!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -193,5 +248,50 @@ const styles = StyleSheet.create({
   },
   switchText: {
     fontSize: 14,
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+  },
+  modalEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  modalMessage: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 24,
+  },
+  modalHint: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  modalButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 48,
+    borderRadius: 12,
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

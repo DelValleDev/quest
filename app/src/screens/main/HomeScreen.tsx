@@ -65,7 +65,7 @@ export const HomeScreen: React.FC = () => {
       {/* Level Progress */}
       <View style={[styles.levelCard, { backgroundColor: theme.surface }]}>
         <View style={styles.levelHeader}>
-          <Text style={styles.mascot}>🐉</Text>
+          <Text style={styles.mascot}>🤖</Text>
           <View style={styles.levelInfo}>
             <Text style={[styles.levelText, { color: theme.text }]}>
               Level {user.level}
