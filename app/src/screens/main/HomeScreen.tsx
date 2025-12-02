@@ -101,7 +101,14 @@ export const HomeScreen: React.FC = () => {
         .select('id, challenge:challenges(id, title, pillar_id, xp_reward, icon)')
         .eq('user_id', user.id)
         .eq('status', 'active');
-      setActiveChallenges(challengesData || []);
+      
+      // Transform data - Supabase returns challenge as array, we need object
+      const transformedChallenges = (challengesData || []).map((item: any) => ({
+        id: item.id,
+        challenge: Array.isArray(item.challenge) ? item.challenge[0] : item.challenge,
+      })).filter((item: any) => item.challenge);
+      
+      setActiveChallenges(transformedChallenges);
 
     } catch (error) {
       console.error('Error fetching data:', error);

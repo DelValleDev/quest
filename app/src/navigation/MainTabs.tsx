@@ -5,6 +5,8 @@ import { useThemeStore } from '../store';
 import { getTheme } from '../theme/colors';
 import { HomeScreen } from '../screens/main/HomeScreen';
 import { ChallengesScreen } from '../screens/main/ChallengesScreen';
+import { DailyQuestsScreen } from '../screens/main/DailyQuestsScreen';
+import { AchievementsScreen } from '../screens/main/AchievementsScreen';
 import { ProfileScreen } from '../screens/main/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -56,11 +58,29 @@ export const MainTabs: React.FC = () => {
         }}
       />
       <Tab.Screen
+        name="Daily"
+        component={DailyQuestsScreen}
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon focused={focused} icon="📋" label="Daily" color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="Challenges"
         component={ChallengesScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
             <TabIcon focused={focused} icon="⚔️" label="Quests" color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Achievements"
+        component={AchievementsScreen}
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon focused={focused} icon="🏆" label="Badges" color={color} />
           ),
         }}
       />
