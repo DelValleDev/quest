@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
@@ -22,6 +23,14 @@ interface Challenge {
   duration_minutes: number | null;
   is_daily: boolean;
   icon: string;
+}
+
+interface ActiveChallenge {
+  id: string;
+  challenge_id: string;
+  status: string;
+  started_at: string;
+  challenge: Challenge;
 }
 
 const PILLAR_COLORS: Record<string, string> = {
@@ -44,8 +53,10 @@ export const ChallengesScreen: React.FC = () => {
   const { mode } = useThemeStore();
   const theme = getTheme(mode);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [activeChallenges, setActiveChallenges] = useState<ActiveChallenge[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPillar, setSelectedPillar] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'available' | 'active'>('available');
 
   const fetchChallenges = async () => {
     setLoading(true);
@@ -60,6 +71,18 @@ export const ChallengesScreen: React.FC = () => {
       
       if (error) throw error;
       setChallenges(data || []);
+
+      // Fetch active challenges
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: activeData } = await supabase
+          .from('user_challenges')
+          .select('*, challenge:challenges(*)')
+          .eq('user_id', user.id)
+          .eq('status', 'active');
+        
+        setActiveChallenges(activeData || []);
+      }
     } catch (error) {
       console.error('Error fetching challenges:', error);
     } finally {
@@ -85,16 +108,86 @@ export const ChallengesScreen: React.FC = () => {
 
       if (error) {
         if (error.code === '23505') {
-          // Already started today
-          alert('You already started this challenge today!');
+          Alert.alert('Already Started', 'You already have this challenge active!');
         } else {
           throw error;
         }
       } else {
-        alert(`🚀 Challenge started: ${challenge.title}`);
+        Alert.alert('🚀 Quest Started!', `Good luck with: ${challenge.title}`);
+        fetchChallenges(); // Refresh
       }
     } catch (error) {
       console.error('Error starting challenge:', error);
+    }
+  };
+
+  const completeChallenge = async (activeChallenge: ActiveChallenge) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const challenge = activeChallenge.challenge;
+
+      // Update challenge status
+      await supabase
+        .from('user_challenges')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', activeChallenge.id);
+
+      // Update user profile (XP and coins)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('total_xp, quest_coins, level')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        const newXp = profile.total_xp + challenge.xp_reward;
+        const newCoins = profile.quest_coins + challenge.coin_reward;
+        const xpForNextLevel = profile.level * 100;
+        const newLevel = newXp >= xpForNextLevel ? profile.level + 1 : profile.level;
+
+        await supabase
+          .from('profiles')
+          .update({ 
+            total_xp: newXp, 
+            quest_coins: newCoins,
+            level: newLevel,
+          })
+          .eq('id', user.id);
+      }
+
+      // Update pillar progress
+      const { data: pillar } = await supabase
+        .from('user_pillars')
+        .select('current_xp, level, challenges_completed')
+        .eq('user_id', user.id)
+        .eq('pillar_id', challenge.pillar_id)
+        .single();
+
+      if (pillar) {
+        const newPillarXp = pillar.current_xp + challenge.xp_reward;
+        const xpNeeded = pillar.level * 100;
+        const newPillarLevel = newPillarXp >= xpNeeded ? pillar.level + 1 : pillar.level;
+        
+        await supabase
+          .from('user_pillars')
+          .update({
+            current_xp: newPillarXp >= xpNeeded ? newPillarXp - xpNeeded : newPillarXp,
+            level: newPillarLevel,
+            challenges_completed: pillar.challenges_completed + 1,
+          })
+          .eq('user_id', user.id)
+          .eq('pillar_id', challenge.pillar_id);
+      }
+
+      Alert.alert(
+        '🎉 Quest Complete!', 
+        `You earned +${challenge.xp_reward} XP and +${challenge.coin_reward} 🪙!`,
+        [{ text: 'Awesome!', onPress: fetchChallenges }]
+      );
+    } catch (error) {
+      console.error('Error completing challenge:', error);
     }
   };
 
@@ -111,56 +204,84 @@ export const ChallengesScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Challenges</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Quests</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          Choose your quest for today
+          {activeTab === 'available' ? 'Choose your quest' : `${activeChallenges.length} active quests`}
         </Text>
       </View>
 
-      {/* Pillar Filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContent}
-      >
+      {/* Tab Switcher */}
+      <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[
-            styles.filterChip,
-            { backgroundColor: !selectedPillar ? theme.primary : theme.surface },
+            styles.tab,
+            activeTab === 'available' && { backgroundColor: theme.primary },
           ]}
-          onPress={() => setSelectedPillar(null)}
+          onPress={() => setActiveTab('available')}
         >
-          <Text style={[styles.filterText, { color: !selectedPillar ? '#FFF' : theme.text }]}>
-            All
+          <Text style={[styles.tabText, { color: activeTab === 'available' ? '#FFF' : theme.textSecondary }]}>
+            Available
           </Text>
         </TouchableOpacity>
-        {pillars.map((pillar) => (
+        <TouchableOpacity
+          style={[
+            styles.tab,
+            activeTab === 'active' && { backgroundColor: theme.primary },
+          ]}
+          onPress={() => setActiveTab('active')}
+        >
+          <Text style={[styles.tabText, { color: activeTab === 'active' ? '#FFF' : theme.textSecondary }]}>
+            Active ({activeChallenges.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Pillar Filter (only for available) */}
+      {activeTab === 'available' && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterContainer}
+          contentContainerStyle={styles.filterContent}
+        >
           <TouchableOpacity
-            key={pillar.id}
             style={[
               styles.filterChip,
-              {
-                backgroundColor:
-                  selectedPillar === pillar.id
-                    ? PILLAR_COLORS[pillar.id]
-                    : theme.surface,
-              },
+              { backgroundColor: !selectedPillar ? theme.primary : theme.surface },
             ]}
-            onPress={() => setSelectedPillar(pillar.id)}
+            onPress={() => setSelectedPillar(null)}
           >
-            <Text style={styles.filterIcon}>{pillar.icon}</Text>
-            <Text
-              style={[
-                styles.filterText,
-                { color: selectedPillar === pillar.id ? '#FFF' : theme.text },
-              ]}
-            >
-              {pillar.name}
+            <Text style={[styles.filterText, { color: !selectedPillar ? '#FFF' : theme.text }]}>
+              All
             </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          {pillars.map((pillar) => (
+            <TouchableOpacity
+              key={pillar.id}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor:
+                    selectedPillar === pillar.id
+                      ? PILLAR_COLORS[pillar.id]
+                      : theme.surface,
+                },
+              ]}
+              onPress={() => setSelectedPillar(pillar.id)}
+            >
+              <Text style={styles.filterIcon}>{pillar.icon}</Text>
+              <Text
+                style={[
+                  styles.filterText,
+                  { color: selectedPillar === pillar.id ? '#FFF' : theme.text },
+                ]}
+              >
+                {pillar.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Challenge List */}
       <ScrollView
@@ -170,7 +291,69 @@ export const ChallengesScreen: React.FC = () => {
           <RefreshControl refreshing={loading} onRefresh={fetchChallenges} />
         }
       >
-        {challenges.map((challenge) => (
+        {activeTab === 'active' ? (
+          // Active Challenges
+          activeChallenges.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🎯</Text>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                No active quests. Start one from Available!
+              </Text>
+            </View>
+          ) : (
+            activeChallenges.map((active) => (
+              <TouchableOpacity
+                key={active.id}
+                style={[
+                  styles.challengeCard,
+                  {
+                    backgroundColor: theme.surface,
+                    borderLeftColor: PILLAR_COLORS[active.challenge.pillar_id],
+                  },
+                ]}
+                onPress={() => {
+                  Alert.alert(
+                    'Complete Quest?',
+                    `Did you finish "${active.challenge.title}"?`,
+                    [
+                      { text: 'Not yet', style: 'cancel' },
+                      { text: '✅ Complete!', onPress: () => completeChallenge(active) },
+                    ]
+                  );
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.challengeHeader}>
+                  <Text style={styles.challengeIcon}>{active.challenge.icon}</Text>
+                  <View style={styles.challengeInfo}>
+                    <Text style={[styles.challengeTitle, { color: theme.text }]}>
+                      {active.challenge.title}
+                    </Text>
+                    <Text style={[styles.challengeDesc, { color: theme.textSecondary }]}>
+                      Tap to complete and earn rewards!
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.challengeFooter}>
+                  <View style={styles.rewardContainer}>
+                    <Text style={[styles.reward, { color: theme.primary }]}>
+                      +{active.challenge.xp_reward} XP
+                    </Text>
+                    <Text style={[styles.reward, { color: '#F59E0B' }]}>
+                      +{active.challenge.coin_reward} 🪙
+                    </Text>
+                  </View>
+                  <View style={[styles.tag, { backgroundColor: '#22C55E' }]}>
+                    <Text style={styles.tagText}>In Progress</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )
+        ) : (
+          // Available Challenges
+          challenges.map((challenge) => (
           <TouchableOpacity
             key={challenge.id}
             style={[
@@ -231,7 +414,8 @@ export const ChallengesScreen: React.FC = () => {
               </View>
             </View>
           </TouchableOpacity>
-        ))}
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -253,6 +437,36 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     marginTop: 4,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
   filterContainer: {
     maxHeight: 50,

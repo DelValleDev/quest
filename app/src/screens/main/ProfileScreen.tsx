@@ -63,13 +63,33 @@ export const ProfileScreen: React.FC = () => {
       if (!user) return;
 
       // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
+      let { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
 
-      if (profileError) throw profileError;
+      // If profile doesn't exist, create it (for users registered before trigger)
+      if (profileError?.code === 'PGRST116') {
+        const displayName = user.email?.split('@')[0] || 'Adventurer';
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({ id: user.id, display_name: displayName })
+          .select()
+          .single();
+        
+        if (createError) throw createError;
+        profileData = newProfile;
+
+        // Also create pillars for this user
+        const pillarIds = ['physical', 'mental', 'social', 'professional', 'spiritual', 'creative'];
+        await supabase.from('user_pillars').insert(
+          pillarIds.map(pillar_id => ({ user_id: user.id, pillar_id }))
+        );
+      } else if (profileError) {
+        throw profileError;
+      }
+      
       setProfile(profileData);
 
       // Fetch pillars
