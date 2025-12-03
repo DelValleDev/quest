@@ -8,9 +8,12 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import type { RootStackParamList } from '../../../App';
 
 interface Challenge {
   id: string;
@@ -52,6 +55,7 @@ const DIFFICULTY_XP: Record<string, { label: string; color: string }> = {
 export const ChallengesScreen: React.FC = () => {
   const { mode } = useThemeStore();
   const theme = getTheme(mode);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [activeChallenges, setActiveChallenges] = useState<ActiveChallenge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -209,6 +213,23 @@ export const ChallengesScreen: React.FC = () => {
           {activeTab === 'available' ? 'Choose your quest' : `${activeChallenges.length} active quests`}
         </Text>
       </View>
+
+      {/* Duels Banner */}
+      <TouchableOpacity
+        style={[styles.duelsBanner, { backgroundColor: theme.surface, borderColor: '#F59E0B' }]}
+        onPress={() => navigation.navigate('Duels')}
+      >
+        <View style={styles.duelsContent}>
+          <Text style={styles.duelsIcon}>⚔️</Text>
+          <View style={styles.duelsTextContainer}>
+            <Text style={[styles.duelsTitle, { color: theme.text }]}>1v1 Duels</Text>
+            <Text style={[styles.duelsSubtitle, { color: theme.textSecondary }]}>
+              Challenge your friends and bet Quest Coins!
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.duelsArrow, { color: theme.textSecondary }]}>›</Text>
+      </TouchableOpacity>
 
       {/* Tab Switcher */}
       <View style={styles.tabContainer}>
@@ -551,5 +572,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#FFF',
+  },
+  duelsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 2,
+  },
+  duelsContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  duelsIcon: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  duelsTextContainer: {
+    flex: 1,
+  },
+  duelsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  duelsSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  duelsArrow: {
+    fontSize: 28,
+    fontWeight: '300',
   },
 });

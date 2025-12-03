@@ -10,6 +10,7 @@ import {
   QuestCoachScreen,
   AssessmentScreen,
   AssessmentResultsScreen,
+  DuelsScreen,
 } from './src/screens';
 import { MainTabs } from './src/navigation';
 import * as Linking from 'expo-linking';
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   QuestCoach: undefined;
+  Duels: undefined;
   Assessment: undefined;
   AssessmentResults: { scores: Record<string, number> };
 };
@@ -113,6 +115,14 @@ export default function App() {
               options={{ 
                 presentation: 'modal',
                 animation: 'slide_from_bottom',
+              }}
+            />
+            <Stack.Screen 
+              name="Duels" 
+              component={DuelsScreen}
+              options={{ 
+                presentation: 'card',
+                animation: 'slide_from_right',
               }}
             />
             <Stack.Screen 

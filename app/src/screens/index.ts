@@ -8,5 +8,6 @@ export { ProfileScreen } from "./main/ProfileScreen";
 export { ShopScreen } from "./main/ShopScreen";
 export { SocialScreen } from "./main/SocialScreen";
 export { QuestCoachScreen } from "./main/QuestCoachScreen";
+export { DuelsScreen } from "./main/DuelsScreen";
 export { AssessmentScreen } from "./onboarding/AssessmentScreen";
 export { AssessmentResultsScreen } from "./onboarding/AssessmentResultsScreen";
