@@ -12,6 +12,7 @@ import {
   AssessmentResultsScreen,
   DuelsScreen,
   RaidsScreen,
+  ClassSelectionScreen,
 } from './src/screens';
 import { MainTabs } from './src/navigation';
 import * as Linking from 'expo-linking';
@@ -23,6 +24,7 @@ export type RootStackParamList = {
   QuestCoach: undefined;
   Duels: undefined;
   Raids: undefined;
+  ClassSelection: { onboarding?: boolean };
   Assessment: undefined;
   AssessmentResults: { scores: Record<string, number> };
 };
@@ -130,6 +132,14 @@ export default function App() {
             <Stack.Screen 
               name="Raids" 
               component={RaidsScreen}
+              options={{ 
+                presentation: 'card',
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen 
+              name="ClassSelection" 
+              component={ClassSelectionScreen}
               options={{ 
                 presentation: 'card',
                 animation: 'slide_from_right',

@@ -8,9 +8,12 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeStore, useAuthStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import type { RootStackParamList } from '../../../App';
 
 interface Profile {
   id: string;
@@ -52,6 +55,7 @@ export const ProfileScreen: React.FC = () => {
   const { mode, toggleTheme } = useThemeStore();
   const { signOut } = useAuthStore();
   const theme = getTheme(mode);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pillars, setPillars] = useState<UserPillar[]>([]);
@@ -235,6 +239,19 @@ export const ProfileScreen: React.FC = () => {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Settings
         </Text>
+
+        <TouchableOpacity
+          style={styles.settingRow}
+          onPress={() => navigation.navigate('ClassSelection', { onboarding: false })}
+        >
+          <Text style={styles.settingIcon}>⚔️</Text>
+          <Text style={[styles.settingText, { color: theme.text }]}>
+            Character Class
+          </Text>
+          <Text style={[styles.settingAction, { color: theme.primary }]}>
+            Change
+          </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.settingRow}
