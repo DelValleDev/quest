@@ -8,6 +8,7 @@ import { ChallengesScreen } from '../screens/main/ChallengesScreen';
 import { DailyQuestsScreen } from '../screens/main/DailyQuestsScreen';
 import { AchievementsScreen } from '../screens/main/AchievementsScreen';
 import { ShopScreen } from '../screens/main/ShopScreen';
+import { SocialScreen } from '../screens/main/SocialScreen';
 import { ProfileScreen } from '../screens/main/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -91,6 +92,15 @@ export const MainTabs: React.FC = () => {
         options={{
           tabBarIcon: ({ focused, color }) => (
             <TabIcon focused={focused} icon="🛒" label="Shop" color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Social"
+        component={SocialScreen}
+        options={{
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon focused={focused} icon="👥" label="Social" color={color} />
           ),
         }}
       />
