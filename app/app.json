@@ -25,8 +25,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
-    ,
-    "scheme": "quest"
+    },
+    "scheme": "quest",
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }

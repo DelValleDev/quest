@@ -339,6 +339,12 @@ CREATE TRIGGER on_profile_level_up
 ALTER TABLE public.activity_feed ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_reactions ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first to avoid conflicts
+DROP POLICY IF EXISTS "Users can view public activities" ON public.activity_feed;
+DROP POLICY IF EXISTS "Users can insert own activities" ON public.activity_feed;
+DROP POLICY IF EXISTS "Users can view all reactions" ON public.activity_reactions;
+DROP POLICY IF EXISTS "Users can manage own reactions" ON public.activity_reactions;
+
 -- Activity feed policies
 CREATE POLICY "Users can view public activities"
 ON public.activity_feed FOR SELECT

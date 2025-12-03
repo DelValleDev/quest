@@ -8,11 +8,13 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
+import questAI from '../../lib/openai';
 
 const { width } = Dimensions.get('window');
 
@@ -55,8 +57,65 @@ export const DailyQuestsScreen: React.FC = () => {
 
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingAI, setGeneratingAI] = useState(false);
   const [completedCount, setCompletedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [showMoodPicker, setShowMoodPicker] = useState(false);
+  const [userMood, setUserMood] = useState<string | null>(null);
+
+  // Generate quests with AI based on user profile
+  const generateAIQuests = async (mood?: string) => {
+    try {
+      setGeneratingAI(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Call AI to generate personalized quests
+      const dailyPlan = await questAI.generateQuests(user.id, mood);
+      
+      if (dailyPlan) {
+        Alert.alert(
+          dailyPlan.greeting || '¡Buenos días! 🌟',
+          dailyPlan.motivation || 'Tus quests personalizados están listos',
+          [{ text: '¡Vamos!' }]
+        );
+      }
+      
+      // Refresh the quests list
+      await fetchDailyQuests();
+    } catch (error: any) {
+      console.error('Error generating AI quests:', error);
+      // If AI fails, fall back to regular quest generation
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.rpc('generate_daily_quests', { p_user_id: user.id });
+          await fetchDailyQuests();
+        }
+      } catch {}
+      
+      if (error.message?.includes('API key')) {
+        Alert.alert(
+          'IA no configurada',
+          'Usando generador estándar de quests. Para quests personalizados, configura la API de OpenAI.',
+          [{ text: 'Entendido' }]
+        );
+      }
+    } finally {
+      setGeneratingAI(false);
+      setShowMoodPicker(false);
+    }
+  };
+
+  // Show mood picker before generating
+  const handleGenerateQuests = () => {
+    setShowMoodPicker(true);
+  };
+
+  const selectMoodAndGenerate = (mood: string) => {
+    setUserMood(mood);
+    generateAIQuests(mood);
+  };
 
   const fetchDailyQuests = async () => {
     try {
@@ -329,6 +388,92 @@ export const DailyQuestsScreen: React.FC = () => {
           </Text>
         )}
       </View>
+
+      {/* Mood Picker Modal */}
+      {showMoodPicker && (
+        <View style={[styles.moodPickerOverlay]}>
+          <View style={[styles.moodPickerCard, { backgroundColor: theme.card }]}>
+            <Text style={[styles.moodPickerTitle, { color: theme.text }]}>
+              ¿Cómo te sientes hoy? 🤔
+            </Text>
+            <Text style={[styles.moodPickerSubtitle, { color: theme.textSecondary }]}>
+              Esto ayuda a la IA a personalizar tus quests
+            </Text>
+            <View style={styles.moodOptions}>
+              {[
+                { mood: 'great', emoji: '😄', label: 'Genial' },
+                { mood: 'good', emoji: '😊', label: 'Bien' },
+                { mood: 'okay', emoji: '😐', label: 'Normal' },
+                { mood: 'bad', emoji: '😔', label: 'Mal' },
+                { mood: 'terrible', emoji: '😢', label: 'Terrible' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.mood}
+                  style={[
+                    styles.moodOption,
+                    { backgroundColor: theme.surface },
+                    userMood === option.mood && { backgroundColor: theme.primary + '30' },
+                  ]}
+                  onPress={() => selectMoodAndGenerate(option.mood)}
+                  disabled={generatingAI}
+                >
+                  <Text style={styles.moodEmoji}>{option.emoji}</Text>
+                  <Text style={[styles.moodLabel, { color: theme.text }]}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {generatingAI && (
+              <View style={styles.generatingContainer}>
+                <ActivityIndicator size="small" color={theme.primary} />
+                <Text style={[styles.generatingText, { color: theme.textSecondary }]}>
+                  🤖 Generando quests personalizados...
+                </Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.cancelButton, { borderColor: theme.border }]}
+              onPress={() => setShowMoodPicker(false)}
+              disabled={generatingAI}
+            >
+              <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Generate AI Quests Button */}
+      {dailyQuests.length === 0 && !loading && (
+        <TouchableOpacity
+          style={[styles.generateButton, { backgroundColor: theme.primary }]}
+          onPress={handleGenerateQuests}
+          disabled={generatingAI}
+        >
+          {generatingAI ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <Text style={styles.generateButtonEmoji}>🤖</Text>
+              <Text style={styles.generateButtonText}>Generar Quests con IA</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {/* Regenerate Button (when there are quests) */}
+      {dailyQuests.length > 0 && completedCount === 0 && (
+        <TouchableOpacity
+          style={[styles.regenerateButton, { backgroundColor: theme.surface, borderColor: theme.primary }]}
+          onPress={handleGenerateQuests}
+          disabled={generatingAI}
+        >
+          <Text style={styles.regenerateEmoji}>🔄</Text>
+          <Text style={[styles.regenerateText, { color: theme.primary }]}>
+            Regenerar con IA
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Quest List */}
       <View style={styles.questList}>
@@ -632,5 +777,112 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  // AI Generation styles
+  generateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  generateButtonEmoji: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  generateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  regenerateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  regenerateEmoji: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  regenerateText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // Mood Picker styles
+  moodPickerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  moodPickerCard: {
+    width: '90%',
+    maxWidth: 360,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  moodPickerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  moodPickerSubtitle: {
+    fontSize: 14,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  moodOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  moodOption: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    minWidth: 70,
+  },
+  moodEmoji: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  moodLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  generatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  generatingText: {
+    marginLeft: 10,
+    fontSize: 14,
+  },
+  cancelButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
