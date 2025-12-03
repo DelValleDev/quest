@@ -20,6 +20,9 @@ type RootStackParamList = {
   QuestCoach: undefined;
   Assessment: undefined;
   AssessmentResults: { scores: Record<string, number> };
+  Agenda: undefined;
+  Duels: undefined;
+  Raids: undefined;
 };
 
 const { width } = Dimensions.get('window');
@@ -525,6 +528,34 @@ export const HomeScreen: React.FC = () => {
         )}
       </View>
 
+      {/* Quick Actions */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity
+            style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
+            onPress={() => navigation.navigate('Agenda')}
+          >
+            <Text style={styles.quickActionIcon}>📅</Text>
+            <Text style={[styles.quickActionLabel, { color: theme.text }]}>Agenda</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
+            onPress={() => navigation.navigate('Duels')}
+          >
+            <Text style={styles.quickActionIcon}>⚔️</Text>
+            <Text style={[styles.quickActionLabel, { color: theme.text }]}>Duels</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
+            onPress={() => navigation.navigate('Raids')}
+          >
+            <Text style={styles.quickActionIcon}>🐉</Text>
+            <Text style={[styles.quickActionLabel, { color: theme.text }]}>Raids</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Assessment CTA if not completed */}
       {!profile?.assessment_completed && (
         <TouchableOpacity
@@ -876,6 +907,26 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#FFFFFF',
     marginLeft: 8,
+  },
+  // Quick Actions
+  quickActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  quickActionCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  quickActionIcon: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  quickActionLabel: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   // FAB
   fabContainer: {

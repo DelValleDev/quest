@@ -166,3 +166,43 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION get_today_summary(UUID) TO authenticated;
+
+-- =====================================================
+-- Quest AI Conversations History
+-- =====================================================
+CREATE TABLE IF NOT EXISTS quest_conversations (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+    user_message TEXT NOT NULL,
+    ai_response TEXT NOT NULL,
+    context JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE quest_conversations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage own conversations"
+    ON quest_conversations FOR ALL
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_user ON quest_conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_created ON quest_conversations(created_at DESC);
+
+-- =====================================================
+-- Add personality columns to profiles
+-- =====================================================
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS has_completed_assessment BOOLEAN DEFAULT false;
+
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS goals TEXT[];
+
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS personality_traits JSONB DEFAULT '{}';
+
+-- Sync has_completed_assessment with assessment_completed
+UPDATE public.profiles 
+SET has_completed_assessment = true 
+WHERE assessment_completed = true 
+AND (has_completed_assessment IS NULL OR has_completed_assessment = false);

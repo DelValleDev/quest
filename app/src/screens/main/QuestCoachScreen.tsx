@@ -10,10 +10,12 @@ import {
   Platform,
   Animated,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import questAI from '../../lib/openai';
 
 const { width } = Dimensions.get('window');
 
@@ -300,17 +302,37 @@ export const QuestCoachScreen: React.FC = () => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageText = inputText.trim();
     setInputText('');
     setIsTyping(true);
     startTypingAnimation();
 
-    // Simulate typing delay
-    setTimeout(() => {
+    try {
+      // Build conversation history for AI
+      const conversationHistory = messages.map(m => ({
+        role: m.isUser ? 'user' as const : 'assistant' as const,
+        content: m.text,
+      }));
+
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user');
+
+      // Call real AI with proper signature
+      const response = await questAI.chat(user.id, messageText, conversationHistory);
+      
       stopTypingAnimation();
       setIsTyping(false);
-      const response = generateResponse(userMessage.text);
       addBotMessage(response);
-    }, 1000 + Math.random() * 1000);
+    } catch (error) {
+      console.error('AI Error:', error);
+      stopTypingAnimation();
+      setIsTyping(false);
+      
+      // Fallback to local responses if AI fails
+      const fallbackResponse = generateResponse(messageText);
+      addBotMessage(fallbackResponse);
+    }
   };
 
   const handleQuickReply = (text: string) => {

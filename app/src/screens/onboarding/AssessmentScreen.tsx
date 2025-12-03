@@ -161,20 +161,29 @@ export const AssessmentScreen: React.FC = () => {
 
       if (scoresError) throw scoresError;
 
-      // Update profile
+      // Update profile with assessment completion
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
           assessment_completed: true,
+          has_completed_assessment: true, // Mark for onboarding flow
           pillar_scores: scores,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', user?.id);
 
       if (updateError) throw updateError;
 
+      // Initialize user availability for calendar
+      try {
+        await supabase.rpc('initialize_user_availability', { p_user_id: user?.id });
+      } catch (e) {
+        console.warn('Could not initialize availability:', e);
+      }
+
       Alert.alert(
         '¡Assessment Completado! 🎉',
-        'Ahora vamos a crear tu plan personalizado',
+        'Ahora vamos a crear tu plan personalizado basado en tu personalidad',
         [
           {
             text: 'Ver Resultados',
