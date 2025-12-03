@@ -364,6 +364,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- =====================================================
 ALTER TABLE public.user_daily_quests ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first
+DROP POLICY IF EXISTS "Users can view own daily quests" ON public.user_daily_quests;
+DROP POLICY IF EXISTS "Users can update own daily quests" ON public.user_daily_quests;
+DROP POLICY IF EXISTS "System can insert daily quests" ON public.user_daily_quests;
+
 CREATE POLICY "Users can view own daily quests"
 ON public.user_daily_quests FOR SELECT
 USING (auth.uid() = user_id);

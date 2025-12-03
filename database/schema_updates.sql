@@ -181,6 +181,7 @@ CREATE TABLE IF NOT EXISTS quest_conversations (
 
 ALTER TABLE quest_conversations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users manage own conversations" ON quest_conversations;
 CREATE POLICY "Users manage own conversations"
     ON quest_conversations FOR ALL
     USING (auth.uid() = user_id)

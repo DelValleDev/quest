@@ -77,6 +77,12 @@ ALTER TABLE user_calendar_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE quest_schedule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_availability ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first to avoid conflicts
+DROP POLICY IF EXISTS "Users manage own calendar integrations" ON user_calendar_integrations;
+DROP POLICY IF EXISTS "Users manage own calendar events" ON user_calendar_events;
+DROP POLICY IF EXISTS "Users manage own quest schedule" ON quest_schedule;
+DROP POLICY IF EXISTS "Users manage own availability" ON user_availability;
+
 -- Users can only see and manage their own calendar data
 CREATE POLICY "Users manage own calendar integrations"
     ON user_calendar_integrations FOR ALL

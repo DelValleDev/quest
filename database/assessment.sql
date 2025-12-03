@@ -53,6 +53,12 @@ CREATE TABLE public.user_assessment_answers (
 ALTER TABLE public.assessment_questions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_assessment_answers ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first
+DROP POLICY IF EXISTS "Anyone can view assessment questions" ON public.assessment_questions;
+DROP POLICY IF EXISTS "Users can view own answers" ON public.user_assessment_answers;
+DROP POLICY IF EXISTS "Users can insert own answers" ON public.user_assessment_answers;
+DROP POLICY IF EXISTS "Users can update own answers" ON public.user_assessment_answers;
+
 -- Everyone can read questions
 CREATE POLICY "Anyone can view assessment questions" ON public.assessment_questions
   FOR SELECT USING (true);

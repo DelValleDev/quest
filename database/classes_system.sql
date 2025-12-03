@@ -322,6 +322,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ALTER TABLE character_classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE class_bonuses ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first
+DROP POLICY IF EXISTS "Anyone can view classes" ON character_classes;
+DROP POLICY IF EXISTS "Anyone can view class bonuses" ON class_bonuses;
+
 -- Everyone can read classes
 CREATE POLICY "Anyone can view classes" ON character_classes
   FOR SELECT USING (true);
