@@ -1,7 +1,8 @@
+
 -- =====================================================
--- QUEST APP - SOCIAL SYSTEM
--- Run this in Supabase SQL Editor AFTER schema.sql
+-- ADD CHALLENGES_COMPLETED TO PROFILES
 -- =====================================================
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS challenges_completed INTEGER DEFAULT 0;
 
 -- =====================================================
 -- FRIEND REQUESTS TABLE
@@ -474,8 +475,6 @@ BEGIN
 END;
 $$;
 
--- =====================================================
--- LEADERBOARD VIEW
 -- =====================================================
 CREATE OR REPLACE VIEW public.leaderboard_global AS
 SELECT 
