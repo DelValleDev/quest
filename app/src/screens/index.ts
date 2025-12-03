@@ -11,5 +11,6 @@ export { QuestCoachScreen } from "./main/QuestCoachScreen";
 export { DuelsScreen } from "./main/DuelsScreen";
 export { RaidsScreen } from "./main/RaidsScreen";
 export { ClassSelectionScreen } from "./main/ClassSelectionScreen";
+export { LeaderboardScreen } from "./main/LeaderboardScreen";
 export { AssessmentScreen } from "./onboarding/AssessmentScreen";
 export { AssessmentResultsScreen } from "./onboarding/AssessmentResultsScreen";

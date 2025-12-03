@@ -1366,6 +1366,23 @@ export const SocialScreen: React.FC = () => {
         <Text style={[styles.raidsBannerArrow, { color: theme.textSecondary }]}>›</Text>
       </TouchableOpacity>
 
+      {/* Leaderboard Banner */}
+      <TouchableOpacity
+        style={[styles.raidsBanner, { backgroundColor: '#8B5CF6' + '20', borderColor: '#8B5CF6', borderWidth: 1 }]}
+        onPress={() => navigation.navigate('Leaderboard')}
+      >
+        <Text style={styles.raidsBannerIcon}>🏆</Text>
+        <View style={styles.raidsBannerContent}>
+          <Text style={[styles.raidsBannerTitle, { color: theme.text }]}>
+            Global Leaderboard
+          </Text>
+          <Text style={[styles.raidsBannerSubtitle, { color: theme.textSecondary }]}>
+            See where you rank!
+          </Text>
+        </View>
+        <Text style={[styles.raidsBannerArrow, { color: theme.textSecondary }]}>›</Text>
+      </TouchableOpacity>
+
       {/* Content */}
       <View style={styles.content}>
         <ScrollView

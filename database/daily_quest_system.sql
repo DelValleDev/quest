@@ -29,6 +29,13 @@ CREATE INDEX IF NOT EXISTS idx_user_daily_quests_user_date
 ON public.user_daily_quests(user_id, assigned_date);
 
 -- =====================================================
+-- DROP EXISTING FUNCTIONS (to allow recreation)
+-- =====================================================
+DROP FUNCTION IF EXISTS generate_daily_quests(UUID);
+DROP FUNCTION IF EXISTS complete_daily_quest(UUID, UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS get_daily_quest_summary(UUID);
+
+-- =====================================================
 -- FUNCTION: Generate daily quests for a user
 -- Assigns 5-8 random daily challenges each day
 -- =====================================================
