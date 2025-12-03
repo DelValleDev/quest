@@ -18,8 +18,8 @@ const { width } = Dimensions.get('window');
 
 interface DailyQuest {
   id: string;
-  challenge_id: string;
-  is_completed: boolean;
+  completed: boolean;
+  completed_at: string | null;
   challenge: {
     id: string;
     title: string;
@@ -56,46 +56,95 @@ export const DailyQuestsScreen: React.FC = () => {
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [loading, setLoading] = useState(true);
   const [completedCount, setCompletedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
 
   const fetchDailyQuests = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Call function to generate/get daily quests
-      const { data: generated, error: genError } = await supabase
-        .rpc('generate_daily_quests', { p_user_id: user.id });
+      // Use the summary function that generates and returns quests
+      const { data: summary, error } = await supabase
+        .rpc('get_daily_quest_summary', { p_user_id: user.id });
 
-      if (genError) {
-        console.error('Error generating daily quests:', genError);
+      if (error) {
+        console.error('Error fetching daily quests:', error);
+        // Fallback to direct query if function doesn't exist
+        await fetchDailyQuestsFallback(user.id);
+        return;
       }
 
-      // Fetch daily quests with challenge details
-      const { data, error } = await supabase
-        .from('daily_quest_pool')
-        .select(`
-          id,
-          challenge_id,
-          is_completed,
-          challenge:challenges(id, title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, icon)
-        `)
-        .eq('user_id', user.id)
-        .eq('date', new Date().toISOString().split('T')[0]);
-
-      if (error) throw error;
-
-      // Transform data
-      const transformed = (data || []).map((item: any) => ({
-        ...item,
-        challenge: Array.isArray(item.challenge) ? item.challenge[0] : item.challenge,
-      })).filter((item: any) => item.challenge);
-
-      setDailyQuests(transformed);
-      setCompletedCount(transformed.filter((q: DailyQuest) => q.is_completed).length);
+      if (summary && summary.quests) {
+        setDailyQuests(summary.quests);
+        setCompletedCount(summary.completed);
+        setTotalCount(summary.total);
+      }
     } catch (error) {
       console.error('Error fetching daily quests:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fallback if the RPC function doesn't exist yet
+  const fetchDailyQuestsFallback = async (userId: string) => {
+    try {
+      // Try generating quests first (ignore errors)
+      try {
+        await supabase.rpc('generate_daily_quests', { p_user_id: userId });
+      } catch {}
+
+      // Fetch from user_daily_quests table
+      const { data, error } = await supabase
+        .from('user_daily_quests')
+        .select(`
+          id,
+          completed,
+          completed_at,
+          daily_quest:challenges!daily_quest_id(id, title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, icon)
+        `)
+        .eq('user_id', userId)
+        .eq('assigned_date', new Date().toISOString().split('T')[0]);
+
+      if (error) {
+        // Try alternative table name
+        const { data: altData } = await supabase
+          .from('daily_quest_pool')
+          .select(`
+            id,
+            is_completed,
+            challenge:challenges(id, title, description, pillar_id, difficulty, xp_reward, coin_reward, duration_minutes, icon)
+          `)
+          .eq('user_id', userId)
+          .eq('date', new Date().toISOString().split('T')[0]);
+
+        if (altData) {
+          const transformed = altData.map((item: any) => ({
+            id: item.id,
+            completed: item.is_completed,
+            completed_at: null,
+            challenge: Array.isArray(item.challenge) ? item.challenge[0] : item.challenge,
+          })).filter((item: any) => item.challenge);
+
+          setDailyQuests(transformed);
+          setCompletedCount(transformed.filter((q: DailyQuest) => q.completed).length);
+          setTotalCount(transformed.length);
+        }
+        return;
+      }
+
+      const transformed = (data || []).map((item: any) => ({
+        id: item.id,
+        completed: item.completed,
+        completed_at: item.completed_at,
+        challenge: Array.isArray(item.daily_quest) ? item.daily_quest[0] : item.daily_quest,
+      })).filter((item: any) => item.challenge);
+
+      setDailyQuests(transformed);
+      setCompletedCount(transformed.filter((q: DailyQuest) => q.completed).length);
+      setTotalCount(transformed.length);
+    } catch (err) {
+      console.error('Fallback fetch error:', err);
     }
   };
 
@@ -106,44 +155,44 @@ export const DailyQuestsScreen: React.FC = () => {
   );
 
   const completeQuest = async (quest: DailyQuest) => {
-    if (quest.is_completed) return;
+    if (quest.completed) return;
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Mark as completed in daily_quest_pool
-      await supabase
-        .from('daily_quest_pool')
-        .update({ is_completed: true })
-        .eq('id', quest.id);
+      // Try to use the new complete_daily_quest function
+      const { data: result, error: rpcError } = await supabase
+        .rpc('complete_daily_quest', { 
+          p_user_id: user.id, 
+          p_quest_assignment_id: quest.id 
+        });
 
-      // Add to user_challenges if not already started
-      const { data: existing } = await supabase
-        .from('user_challenges')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('challenge_id', quest.challenge_id)
-        .eq('status', 'active')
-        .single();
-
-      if (existing) {
-        // Complete existing challenge
-        await supabase
-          .from('user_challenges')
-          .update({ status: 'completed', completed_at: new Date().toISOString() })
-          .eq('id', existing.id);
-      } else {
-        // Create and complete
-        await supabase
-          .from('user_challenges')
-          .insert({
-            user_id: user.id,
-            challenge_id: quest.challenge_id,
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-          });
+      if (!rpcError && result?.success) {
+        Alert.alert(
+          'Quest Complete! 🎉',
+          `+${result.xp_earned} XP | +${result.coins_earned} 🪙${result.all_completed_bonus ? '\n🏆 All daily quests bonus!' : ''}`,
+          [{ text: 'Awesome!' }]
+        );
+        fetchDailyQuests();
+        return;
       }
+
+      // Fallback to manual completion
+      // Mark as completed in user_daily_quests or daily_quest_pool
+      await supabase
+        .from('user_daily_quests')
+        .update({ completed: true, completed_at: new Date().toISOString() })
+        .eq('id', quest.id)
+        .then(({ error }) => {
+          if (error) {
+            // Try alternative table
+            return supabase
+              .from('daily_quest_pool')
+              .update({ is_completed: true })
+              .eq('id', quest.id);
+          }
+        });
 
       // Update profile XP and coins
       const { data: profile } = await supabase
@@ -293,10 +342,10 @@ export const DailyQuestsScreen: React.FC = () => {
               style={[
                 styles.questCard,
                 { backgroundColor: theme.surface },
-                quest.is_completed && styles.questCompleted,
+                quest.completed && styles.questCompleted,
               ]}
               onPress={() => completeQuest(quest)}
-              disabled={quest.is_completed}
+              disabled={quest.completed}
             >
               <View
                 style={[
@@ -307,7 +356,7 @@ export const DailyQuestsScreen: React.FC = () => {
 
               <View style={styles.questIconContainer}>
                 <Text style={styles.questIcon}>{quest.challenge.icon}</Text>
-                {quest.is_completed && (
+                {quest.completed && (
                   <View style={styles.checkmark}>
                     <Text style={styles.checkmarkText}>✓</Text>
                   </View>
@@ -320,7 +369,7 @@ export const DailyQuestsScreen: React.FC = () => {
                     style={[
                       styles.questTitle,
                       { color: theme.text },
-                      quest.is_completed && styles.textCompleted,
+                      quest.completed && styles.textCompleted,
                     ]}
                   >
                     {quest.challenge.title}
@@ -336,7 +385,7 @@ export const DailyQuestsScreen: React.FC = () => {
                   style={[
                     styles.questDescription,
                     { color: theme.textSecondary },
-                    quest.is_completed && styles.textCompleted,
+                    quest.completed && styles.textCompleted,
                   ]}
                   numberOfLines={2}
                 >
@@ -362,7 +411,7 @@ export const DailyQuestsScreen: React.FC = () => {
                 </View>
               </View>
 
-              {!quest.is_completed && (
+              {!quest.completed && (
                 <View style={[styles.completeButton, { backgroundColor: theme.primary }]}>
                   <Text style={styles.completeButtonText}>✓</Text>
                 </View>
