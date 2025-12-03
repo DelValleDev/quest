@@ -314,6 +314,14 @@ ALTER TABLE public.achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_quest_pool ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (for re-running)
+DROP POLICY IF EXISTS "Anyone can view achievements" ON public.achievements;
+DROP POLICY IF EXISTS "Users can view own achievements" ON public.user_achievements;
+DROP POLICY IF EXISTS "Users can insert own achievements" ON public.user_achievements;
+DROP POLICY IF EXISTS "Users can view own daily quests" ON public.daily_quest_pool;
+DROP POLICY IF EXISTS "Users can insert own daily quests" ON public.daily_quest_pool;
+DROP POLICY IF EXISTS "Users can update own daily quests" ON public.daily_quest_pool;
+
 -- Anyone can read achievements
 CREATE POLICY "Anyone can view achievements" ON public.achievements
   FOR SELECT USING (true);
