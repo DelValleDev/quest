@@ -5,3 +5,8 @@ export { ChallengesScreen } from "./main/ChallengesScreen";
 export { DailyQuestsScreen } from "./main/DailyQuestsScreen";
 export { AchievementsScreen } from "./main/AchievementsScreen";
 export { ProfileScreen } from "./main/ProfileScreen";
+export { ShopScreen } from "./main/ShopScreen";
+export { SocialScreen } from "./main/SocialScreen";
+export { QuestCoachScreen } from "./main/QuestCoachScreen";
+export { AssessmentScreen } from "./onboarding/AssessmentScreen";
+export { AssessmentResultsScreen } from "./onboarding/AssessmentResultsScreen";

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,20 @@ import {
   TouchableOpacity,
   Dimensions,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+type RootStackParamList = {
+  Main: undefined;
+  QuestCoach: undefined;
+  Assessment: undefined;
+  AssessmentResults: { scores: Record<string, number> };
+};
 
 const { width } = Dimensions.get('window');
 
@@ -21,7 +30,55 @@ interface Profile {
   total_xp: number;
   quest_coins: number;
   current_streak: number;
+  assessment_completed: boolean;
+  pillar_scores: Record<string, number> | null;
 }
+
+interface DailyQuest {
+  id: string;
+  title: string;
+  xp_reward: number;
+  coin_reward: number;
+  pillar_id: string;
+  completed: boolean;
+}
+
+// Quest Mascot messages based on context
+const MASCOT_MESSAGES = {
+  morning: [
+    "¡Buenos días, campeón! 🌅 Hoy es un nuevo día para crecer.",
+    "☀️ El amanecer trae nuevas oportunidades. ¡A conquistarlas!",
+    "🌄 Cada mañana es una página en blanco. ¡Escribe algo épico!",
+  ],
+  afternoon: [
+    "💪 ¡Sigue así! Ya has logrado mucho hoy.",
+    "🔥 La tarde es perfecta para completar tus misiones.",
+    "⚡ ¡Estás a mitad del camino! No te detengas.",
+  ],
+  evening: [
+    "🌙 Termina el día fuerte. ¡Tú puedes!",
+    "✨ La noche es joven y tú eres imparable.",
+    "🌟 Reflexiona sobre tus logros de hoy.",
+  ],
+  streak: [
+    "🔥 ¡{streak} días de racha! ¡Eres una leyenda!",
+    "💎 Racha de {streak} días. ¡La consistencia es poder!",
+    "⚡ {streak} días seguidos. ¡Nada te detiene!",
+  ],
+  newUser: [
+    "🎮 ¡Bienvenido a Quest! Tu aventura comienza ahora.",
+    "🚀 Soy Quest, tu compañero. ¡Vamos a ser increíbles juntos!",
+    "✨ Completa el assessment para conocer tus fortalezas.",
+  ],
+  lowScore: [
+    "📈 {pillar} necesita atención. ¡Te ayudaré a mejorar!",
+    "💪 Pequeños pasos en {pillar} = grandes resultados.",
+  ],
+  highScore: [
+    "🏆 ¡Tu {pillar} está brillando! Sigue así.",
+    "⭐ Eres muy fuerte en {pillar}. ¡Inspira a otros!",
+  ],
+};
 
 interface UserPillar {
   pillar_id: string;
@@ -52,21 +109,111 @@ const PILLARS = [
 export const HomeScreen: React.FC = () => {
   const { mode, toggleTheme } = useThemeStore();
   const theme = getTheme(mode);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pillars, setPillars] = useState<UserPillar[]>([]);
   const [activeChallenges, setActiveChallenges] = useState<ActiveChallenge[]>([]);
+  const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mascotBounce] = useState(new Animated.Value(0));
+  const [fabPulse] = useState(new Animated.Value(1));
+
+  // FAB pulse animation
+  useEffect(() => {
+    const pulse = () => {
+      Animated.sequence([
+        Animated.timing(fabPulse, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fabPulse, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start(() => pulse());
+    };
+    pulse();
+  }, []);
+
+  // Mascot bounce animation
+  useEffect(() => {
+    const animate = () => {
+      Animated.sequence([
+        Animated.timing(mascotBounce, {
+          toValue: -8,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(mascotBounce, {
+          toValue: 0,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setTimeout(animate, 2000);
+      });
+    };
+    animate();
+  }, []);
+
+  // Get contextual mascot message
+  const getMascotMessage = useMemo(() => {
+    const hour = new Date().getHours();
+    let timeMessages: string[];
+    
+    if (hour >= 5 && hour < 12) {
+      timeMessages = MASCOT_MESSAGES.morning;
+    } else if (hour >= 12 && hour < 18) {
+      timeMessages = MASCOT_MESSAGES.afternoon;
+    } else {
+      timeMessages = MASCOT_MESSAGES.evening;
+    }
+
+    // New user without assessment
+    if (!profile?.assessment_completed) {
+      return MASCOT_MESSAGES.newUser[Math.floor(Math.random() * MASCOT_MESSAGES.newUser.length)];
+    }
+
+    // High streak message
+    if (profile?.current_streak && profile.current_streak >= 7) {
+      const msg = MASCOT_MESSAGES.streak[Math.floor(Math.random() * MASCOT_MESSAGES.streak.length)];
+      return msg.replace('{streak}', String(profile.current_streak));
+    }
+
+    // Find weakest pillar
+    if (profile?.pillar_scores) {
+      const scores = profile.pillar_scores;
+      const weakest = Object.entries(scores).reduce((a, b) => a[1] < b[1] ? a : b);
+      const strongest = Object.entries(scores).reduce((a, b) => a[1] > b[1] ? a : b);
+      
+      if (weakest[1] < 40) {
+        const pillar = PILLARS.find(p => p.id === weakest[0]);
+        const msg = MASCOT_MESSAGES.lowScore[Math.floor(Math.random() * MASCOT_MESSAGES.lowScore.length)];
+        return msg.replace('{pillar}', pillar?.name || weakest[0]);
+      }
+      
+      if (strongest[1] >= 80 && Math.random() > 0.5) {
+        const pillar = PILLARS.find(p => p.id === strongest[0]);
+        const msg = MASCOT_MESSAGES.highScore[Math.floor(Math.random() * MASCOT_MESSAGES.highScore.length)];
+        return msg.replace('{pillar}', pillar?.name || strongest[0]);
+      }
+    }
+
+    return timeMessages[Math.floor(Math.random() * timeMessages.length)];
+  }, [profile]);
 
   const fetchData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch profile
+      // Fetch profile with assessment fields
       let { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('display_name, level, total_xp, quest_coins, current_streak')
+        .select('display_name, level, total_xp, quest_coins, current_streak, assessment_completed, pillar_scores')
         .eq('id', user.id)
         .single();
 
@@ -76,7 +223,7 @@ export const HomeScreen: React.FC = () => {
         const { data: newProfile } = await supabase
           .from('profiles')
           .insert({ id: user.id, display_name: displayName })
-          .select('display_name, level, total_xp, quest_coins, current_streak')
+          .select('display_name, level, total_xp, quest_coins, current_streak, assessment_completed, pillar_scores')
           .single();
         profileData = newProfile;
 
@@ -94,6 +241,25 @@ export const HomeScreen: React.FC = () => {
         .select('pillar_id, level, current_xp')
         .eq('user_id', user.id);
       setPillars(pillarsData || []);
+
+      // Fetch today's daily quests
+      const today = new Date().toISOString().split('T')[0];
+      const { data: dailyQuestsData } = await supabase
+        .from('user_daily_quests')
+        .select('id, daily_quest:daily_quests(id, title, xp_reward, coin_reward, pillar_id), completed')
+        .eq('user_id', user.id)
+        .eq('assigned_date', today)
+        .limit(3);
+      
+      const transformedDailyQuests = (dailyQuestsData || []).map((item: any) => ({
+        id: item.id,
+        title: item.daily_quest?.title || 'Quest',
+        xp_reward: item.daily_quest?.xp_reward || 10,
+        coin_reward: item.daily_quest?.coin_reward || 5,
+        pillar_id: item.daily_quest?.pillar_id || 'physical',
+        completed: item.completed,
+      }));
+      setDailyQuests(transformedDailyQuests);
 
       // Fetch active challenges
       const { data: challengesData } = await supabase
@@ -133,8 +299,9 @@ export const HomeScreen: React.FC = () => {
   };
 
   return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
+      style={styles.scrollView}
       contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl refreshing={loading} onRefresh={fetchData} />
@@ -155,32 +322,75 @@ export const HomeScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Level Progress */}
-      <View style={[styles.levelCard, { backgroundColor: theme.surface }]}>
-        <View style={styles.levelHeader}>
-          <Text style={styles.mascot}>🤖</Text>
-          <View style={styles.levelInfo}>
-            <Text style={[styles.levelText, { color: theme.text }]}>
-              Level {profile?.level || 1}
-            </Text>
-            <Text style={[styles.xpText, { color: theme.textSecondary }]}>
-              {profile?.total_xp || 0} / {xpToNextLevel} XP
-            </Text>
-          </View>
-          <View style={styles.statsContainer}>
-            <View style={styles.stat}>
-              <Text style={styles.statEmoji}>🔥</Text>
-              <Text style={[styles.statValue, { color: theme.text }]}>
-                {profile?.current_streak || 0}
-              </Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statEmoji}>🪙</Text>
-              <Text style={[styles.statValue, { color: '#F59E0B' }]}>
-                {profile?.quest_coins || 0}
+      {/* Quest Mascot Card */}
+      <View style={[styles.mascotCard, { backgroundColor: theme.primary + '20' }]}>
+        <View style={styles.mascotContainer}>
+          <Animated.Text 
+            style={[
+              styles.mascotEmoji, 
+              { transform: [{ translateY: mascotBounce }] }
+            ]}
+          >
+            🤖
+          </Animated.Text>
+          <View style={styles.speechBubble}>
+            <View style={[styles.bubbleArrow, { borderRightColor: theme.card }]} />
+            <View style={[styles.bubbleContent, { backgroundColor: theme.card }]}>
+              <Text style={[styles.mascotMessage, { color: theme.text }]}>
+                {getMascotMessage}
               </Text>
             </View>
           </View>
+        </View>
+      </View>
+
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
+          <Text style={styles.statCardEmoji}>⚡</Text>
+          <Text style={[styles.statCardValue, { color: theme.text }]}>
+            Lv {profile?.level || 1}
+          </Text>
+          <Text style={[styles.statCardLabel, { color: theme.textSecondary }]}>
+            Level
+          </Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
+          <Text style={styles.statCardEmoji}>🔥</Text>
+          <Text style={[styles.statCardValue, { color: '#EF4444' }]}>
+            {profile?.current_streak || 0}
+          </Text>
+          <Text style={[styles.statCardLabel, { color: theme.textSecondary }]}>
+            Streak
+          </Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
+          <Text style={styles.statCardEmoji}>🪙</Text>
+          <Text style={[styles.statCardValue, { color: '#F59E0B' }]}>
+            {profile?.quest_coins || 0}
+          </Text>
+          <Text style={[styles.statCardLabel, { color: theme.textSecondary }]}>
+            Coins
+          </Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
+          <Text style={styles.statCardEmoji}>⭐</Text>
+          <Text style={[styles.statCardValue, { color: theme.primary }]}>
+            {profile?.total_xp || 0}
+          </Text>
+          <Text style={[styles.statCardLabel, { color: theme.textSecondary }]}>
+            Total XP
+          </Text>
+        </View>
+      </View>
+
+      {/* XP Progress Bar */}
+      <View style={[styles.xpCard, { backgroundColor: theme.surface }]}>
+        <View style={styles.xpHeader}>
+          <Text style={[styles.xpTitle, { color: theme.text }]}>Progress to Level {(profile?.level || 1) + 1}</Text>
+          <Text style={[styles.xpAmount, { color: theme.primary }]}>
+            {profile?.total_xp ? profile.total_xp % 100 : 0} / 100 XP
+          </Text>
         </View>
         <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
           <View
@@ -195,24 +405,79 @@ export const HomeScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Today's Daily Quests */}
+      {dailyQuests.length > 0 && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>🎯 Today's Quests</Text>
+          {dailyQuests.map((quest) => {
+            const pillar = PILLARS.find((p) => p.id === quest.pillar_id);
+            return (
+              <View
+                key={quest.id}
+                style={[
+                  styles.dailyQuestCard, 
+                  { 
+                    backgroundColor: quest.completed ? theme.primary + '10' : theme.surface,
+                    borderColor: quest.completed ? theme.primary : 'transparent',
+                    borderWidth: quest.completed ? 1 : 0,
+                  }
+                ]}
+              >
+                <View style={[styles.dailyPillarDot, { backgroundColor: pillar?.color }]} />
+                <Text style={styles.dailyEmoji}>{quest.completed ? '✅' : pillar?.emoji}</Text>
+                <View style={styles.dailyQuestContent}>
+                  <Text 
+                    style={[
+                      styles.dailyQuestTitle, 
+                      { 
+                        color: theme.text,
+                        textDecorationLine: quest.completed ? 'line-through' : 'none',
+                        opacity: quest.completed ? 0.6 : 1,
+                      }
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {quest.title}
+                  </Text>
+                  <View style={styles.dailyRewards}>
+                    <Text style={[styles.dailyReward, { color: theme.primary }]}>+{quest.xp_reward} XP</Text>
+                    <Text style={[styles.dailyReward, { color: '#F59E0B' }]}>+{quest.coin_reward} 🪙</Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
       {/* Pillars Section */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Pillars</Text>
         <View style={styles.pillarsGrid}>
-          {PILLARS.map((pillar) => (
-            <TouchableOpacity
-              key={pillar.id}
-              style={[styles.pillarCard, { backgroundColor: theme.surface }]}
-            >
-              <Text style={styles.pillarEmoji}>{pillar.emoji}</Text>
-              <Text style={[styles.pillarName, { color: theme.text }]}>
-                {pillar.name}
-              </Text>
-              <Text style={[styles.pillarLevel, { color: pillar.color }]}>
-                Lv {getPillarLevel(pillar.id)}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {PILLARS.map((pillar) => {
+            const pillarScore = profile?.pillar_scores?.[pillar.id] || 0;
+            return (
+              <TouchableOpacity
+                key={pillar.id}
+                style={[styles.pillarCard, { backgroundColor: theme.surface }]}
+              >
+                <Text style={styles.pillarEmoji}>{pillar.emoji}</Text>
+                <Text style={[styles.pillarName, { color: theme.text }]}>
+                  {pillar.name}
+                </Text>
+                <Text style={[styles.pillarLevel, { color: pillar.color }]}>
+                  Lv {getPillarLevel(pillar.id)}
+                </Text>
+                {profile?.assessment_completed && (
+                  <View style={[styles.pillarScoreBadge, { backgroundColor: pillar.color + '20' }]}>
+                    <Text style={[styles.pillarScoreText, { color: pillar.color }]}>
+                      {Math.round(pillarScore)}%
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -259,7 +524,36 @@ export const HomeScreen: React.FC = () => {
           })
         )}
       </View>
+
+      {/* Assessment CTA if not completed */}
+      {!profile?.assessment_completed && (
+        <TouchableOpacity
+          style={[styles.assessmentCta, { backgroundColor: theme.primary }]}
+          onPress={() => navigation.navigate('Assessment')}
+        >
+          <Text style={styles.ctaEmoji}>🎯</Text>
+          <View style={styles.ctaContent}>
+            <Text style={styles.ctaTitle}>Complete Your Assessment</Text>
+            <Text style={styles.ctaSubtitle}>
+              Discover your strengths and areas to improve
+            </Text>
+          </View>
+          <Text style={styles.ctaArrow}>→</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
+
+    {/* Quest Coach FAB */}
+    <Animated.View style={[styles.fabContainer, { transform: [{ scale: fabPulse }] }]}>
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.primary }]}
+        onPress={() => navigation.navigate('QuestCoach')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.fabEmoji}>🤖</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  </View>
   );
 };
 
@@ -287,6 +581,134 @@ const styles = StyleSheet.create({
   },
   themeToggle: {
     padding: 8,
+  },
+  // Quest Mascot Card
+  mascotCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  mascotContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mascotEmoji: {
+    fontSize: 56,
+    marginRight: 12,
+  },
+  speechBubble: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bubbleArrow: {
+    width: 0,
+    height: 0,
+    borderTopWidth: 8,
+    borderBottomWidth: 8,
+    borderRightWidth: 12,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  bubbleContent: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+  },
+  mascotMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  // Stats Row
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  statCardEmoji: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  statCardValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  statCardLabel: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  // XP Progress Card
+  xpCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  xpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  xpTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  xpAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  // Daily Quests
+  dailyQuestCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  dailyPillarDot: {
+    width: 4,
+    height: 36,
+    borderRadius: 2,
+    marginRight: 10,
+  },
+  dailyEmoji: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  dailyQuestContent: {
+    flex: 1,
+  },
+  dailyQuestTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  dailyRewards: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dailyReward: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Pillar Score Badge
+  pillarScoreBadge: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  pillarScoreText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   levelCard: {
     borderRadius: 16,
@@ -420,5 +842,60 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  // ScrollView
+  scrollView: {
+    flex: 1,
+  },
+  // Assessment CTA
+  assessmentCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+  },
+  ctaEmoji: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  ctaContent: {
+    flex: 1,
+  },
+  ctaTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  ctaSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  ctaArrow: {
+    fontSize: 24,
+    color: '#FFFFFF',
+    marginLeft: 8,
+  },
+  // FAB
+  fabContainer: {
+    position: 'absolute',
+    bottom: 100,
+    right: 20,
+  },
+  fab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  fabEmoji: {
+    fontSize: 32,
   },
 });

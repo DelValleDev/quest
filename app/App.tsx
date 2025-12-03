@@ -4,11 +4,26 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useThemeStore, useAuthStore } from './src/store';
 import { supabase } from './src/lib/supabase';
-import { WelcomeScreen, AuthScreen } from './src/screens';
+import { 
+  WelcomeScreen, 
+  AuthScreen, 
+  QuestCoachScreen,
+  AssessmentScreen,
+  AssessmentResultsScreen,
+} from './src/screens';
 import { MainTabs } from './src/navigation';
 import * as Linking from 'expo-linking';
 
-const Stack = createNativeStackNavigator();
+export type RootStackParamList = {
+  Welcome: undefined;
+  Auth: undefined;
+  Main: undefined;
+  QuestCoach: undefined;
+  Assessment: undefined;
+  AssessmentResults: { scores: Record<string, number> };
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   const { mode } = useThemeStore();
@@ -90,7 +105,33 @@ export default function App() {
             {() => <AuthScreen onAuthSuccess={handleAuthSuccess} />}
           </Stack.Screen>
         ) : (
-          <Stack.Screen name="Main" component={MainTabs} />
+          <>
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen 
+              name="QuestCoach" 
+              component={QuestCoachScreen}
+              options={{ 
+                presentation: 'modal',
+                animation: 'slide_from_bottom',
+              }}
+            />
+            <Stack.Screen 
+              name="Assessment" 
+              component={AssessmentScreen}
+              options={{ 
+                presentation: 'fullScreenModal',
+                animation: 'slide_from_right',
+              }}
+            />
+            <Stack.Screen 
+              name="AssessmentResults" 
+              component={AssessmentResultsScreen}
+              options={{ 
+                presentation: 'fullScreenModal',
+                animation: 'fade',
+              }}
+            />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
