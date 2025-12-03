@@ -13,9 +13,12 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeStore, useAuthStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import type { RootStackParamList } from '../../../App';
 
 // =====================================================
 // TYPES
@@ -93,6 +96,7 @@ export const SocialScreen: React.FC = () => {
   const { mode } = useThemeStore();
   const { user } = useAuthStore();
   const theme = getTheme(mode);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   // Tab state
   const [activeTab, setActiveTab] = useState('friends');
@@ -995,6 +999,36 @@ export const SocialScreen: React.FC = () => {
     emojiBtnText: {
       fontSize: 24,
     },
+    // Raids Banner
+    raidsBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 20,
+      marginBottom: 12,
+      padding: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#F59E0B',
+    },
+    raidsBannerIcon: {
+      fontSize: 28,
+      marginRight: 12,
+    },
+    raidsBannerContent: {
+      flex: 1,
+    },
+    raidsBannerTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    raidsBannerSubtitle: {
+      fontSize: 12,
+      marginTop: 2,
+    },
+    raidsBannerArrow: {
+      fontSize: 24,
+      fontWeight: '300',
+    },
   });
 
   // =====================================================
@@ -1314,6 +1348,23 @@ export const SocialScreen: React.FC = () => {
           ))}
         </View>
       </View>
+
+      {/* Raids Banner */}
+      <TouchableOpacity
+        style={[styles.raidsBanner, { backgroundColor: theme.card }]}
+        onPress={() => navigation.navigate('Raids')}
+      >
+        <Text style={styles.raidsBannerIcon}>⚔️</Text>
+        <View style={styles.raidsBannerContent}>
+          <Text style={[styles.raidsBannerTitle, { color: theme.text }]}>
+            Group Raids
+          </Text>
+          <Text style={[styles.raidsBannerSubtitle, { color: theme.textSecondary }]}>
+            Challenge your friends together!
+          </Text>
+        </View>
+        <Text style={[styles.raidsBannerArrow, { color: theme.textSecondary }]}>›</Text>
+      </TouchableOpacity>
 
       {/* Content */}
       <View style={styles.content}>
