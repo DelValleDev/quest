@@ -1,4 +1,9 @@
 import { supabase } from "./supabase";
+import {
+  parseToolCalls,
+  executeToolCalls,
+  getAISystemPromptWithTools,
+} from "./aiTools";
 
 // OpenAI API configuration
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY || "";
@@ -57,11 +62,21 @@ Your personality:
 - Celebrate wins, acknowledge struggles
 - Give actionable advice, not generic platitudes
 
-You have access to the user's:
+You have FULL ACCESS to the user's data:
 - Personality assessment scores (6 pillars: physical, mental, social, professional, spiritual, creative)
 - Current goals and class (warrior, sage, connector, creator, achiever, monk)
 - Streak and level
-- Today's completed and pending quests
+- ALL their Life Paths (long-term goals) with milestones
+- ALL their Habits and completion history
+- ALL their Quests (daily challenges) - completed and pending
+- Their entire profile and progress
+
+YOU CAN:
+1. View and analyze ALL their data
+2. Create new Life Paths, Habits, and Quests
+3. Modify existing Life Paths, Habits, and Quests
+4. Delete or archive Life Paths, Habits, and Quests
+5. Provide insights based on their complete history
 
 Your job:
 1. Generate personalized daily quests based on their weak areas and goals
@@ -69,8 +84,10 @@ Your job:
 3. Answer questions about habits, productivity, wellness
 4. Help them plan their day/week
 5. Celebrate achievements and support through failures
+6. PROACTIVELY manage their Life Paths, Habits, and Quests based on conversation
 
-Always respond in the user's language (Spanish if they write in Spanish).`;
+Always respond in the user's language (Spanish if they write in Spanish).
+When the user asks about their progress or goals, reference their ACTUAL Life Paths, Habits, and Quests.`;
 
 const QUEST_GENERATION_PROMPT = `You are a quest generator for a personal development app.
 
@@ -156,26 +173,87 @@ async function callOpenAI(
 // =====================================================
 
 /**
- * Chat with Quest AI coach
+ * Check if user is asking to create quests
+ */
+function isQuestCreationRequest(message: string): boolean {
+  const questKeywords = [
+    "crear quest",
+    "create quest",
+    "crea un quest",
+    "crea una quest",
+    "dame un quest",
+    "dame una quest",
+    "give me a quest",
+    "give me quests",
+    "nueva misión",
+    "nuevo reto",
+    "nuevo desafío",
+    "new quest",
+    "new challenge",
+    "quiero un quest",
+    "quiero una misión",
+    "i want a quest",
+    "want a quest",
+    "generar quest",
+    "generate quest",
+    "genera un quest",
+    "genera quests",
+    "crear reto",
+    "crear desafío",
+    "dame retos",
+    "dame desafíos",
+    "misiones para hoy",
+    "quests for today",
+    "retos para hoy",
+    "asignar quest",
+    "assign quest",
+    "crear misión",
+    "nueva misión",
+  ];
+
+  const lowerMessage = message.toLowerCase();
+  return questKeywords.some((keyword) => lowerMessage.includes(keyword));
+}
+
+/**
+ * Chat with Quest AI coach - Now with tool execution!
  */
 export async function chatWithQuest(
   userId: string,
   message: string,
   conversationHistory: CoachMessage[] = []
 ): Promise<string> {
-  // Get user profile for context
-  const profile = await getUserProfileForAI(userId);
+  // Check if user wants to create quests the old way
+  if (isQuestCreationRequest(message)) {
+    try {
+      const dailyPlan = await generatePersonalizedQuests(userId);
+      const questList = dailyPlan.quests
+        .map(
+          (q, i) =>
+            `${i + 1}. ${q.icon} **${q.title}** (${q.pillar_id}) - ${
+              q.xp_reward
+            } XP\n   ${q.description}`
+        )
+        .join("\n\n");
 
-  const systemMessage = `${QUEST_COACH_SYSTEM_PROMPT}
+      return `¡Listo! 🎯 He creado ${dailyPlan.quests.length} quests personalizadas para ti:\n\n${questList}\n\n💡 **Enfoque de hoy:** ${dailyPlan.focus_pillar}\n\n${dailyPlan.motivation}\n\n*Los quests ya están en tu lista. ¡Ve a completarlos! 💪*`;
+    } catch (error) {
+      console.error("Error creating quests:", error);
+      return "❌ Hubo un problema al crear tus quests. Por favor intenta de nuevo en unos momentos.";
+    }
+  }
 
-USER PROFILE:
-- Name: ${profile.display_name}
-- Class: ${profile.user_class}
-- Level: ${profile.level}
-- Streak: ${profile.current_streak} days
-- Pillar scores: ${JSON.stringify(profile.pillar_scores)}
-- Weakest area: ${getWeakestPillar(profile.pillar_scores)}
-- Strongest area: ${getStrongestPillar(profile.pillar_scores)}`;
+  // Get COMPLETE user context (Life Paths, Habits, Quests, Profile)
+  const userContext = await getCompleteUserContext(userId);
+
+  // Enhanced system prompt with tool capabilities
+  const systemMessage = `${getAISystemPromptWithTools()}
+
+${userContext}
+
+IMPORTANT: The user expects you to know EVERYTHING about their Life Paths, Habits, and Quests.
+When they ask "what are my life paths?" or "what habits do I have?", refer to the data above.
+You can create, modify, or delete any of these items based on the conversation.`;
 
   const messages: CoachMessage[] = [
     { role: "system", content: systemMessage },
@@ -183,12 +261,33 @@ USER PROFILE:
     { role: "user", content: message },
   ];
 
-  const response = await callOpenAI(messages, { temperature: 0.8 });
+  const response = await callOpenAI(messages, {
+    temperature: 0.8,
+    max_tokens: 1500,
+  });
+
+  // Parse and execute any tool calls in the response
+  const toolCalls = parseToolCalls(response);
+  let finalResponse = response;
+
+  if (toolCalls.length > 0) {
+    // Execute the tools
+    const toolResults = await executeToolCalls(userId, toolCalls);
+
+    // Remove tool tags from response and add results
+    finalResponse = response.replace(/\[TOOL:\w+\].*?\[\/TOOL\]/g, "").trim();
+
+    // Add tool execution results to the response
+    const resultMessages = toolResults.map((r) => r.message).join("\n");
+    if (resultMessages) {
+      finalResponse = finalResponse + "\n\n" + resultMessages;
+    }
+  }
 
   // Save conversation to database
-  await saveConversation(userId, message, response);
+  await saveConversation(userId, message, finalResponse);
 
-  return response;
+  return finalResponse;
 }
 
 /**
@@ -311,7 +410,7 @@ async function getUserProfileForAI(userId: string): Promise<UserProfile> {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, display_name, user_class, level, total_xp, current_streak, pillar_scores"
+      "id, display_name, user_class, level, total_xp, current_streak, pillar_scores, goals, personality_traits"
     )
     .eq("id", userId)
     .single();
@@ -333,7 +432,126 @@ async function getUserProfileForAI(userId: string): Promise<UserProfile> {
       spiritual: 50,
       creative: 50,
     },
+    goals: data.goals || [],
+    personality_traits: data.personality_traits || [],
   };
+}
+
+/**
+ * Get COMPLETE user context for AI (Life Paths, Habits, Quests)
+ */
+async function getCompleteUserContext(userId: string): Promise<string> {
+  const profile = await getUserProfileForAI(userId);
+
+  // Fetch Life Paths with milestones
+  const { data: lifePaths } = await supabase
+    .from("life_paths")
+    .select(
+      `
+      id, title, description, pillar_id, vision_statement, 
+      why_important, target_date, status, progress_percentage,
+      path_milestones(id, title, target_date, status, completed_date)
+    `
+    )
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false });
+
+  // Fetch Active Habits
+  const { data: habits } = await supabase
+    .from("habits")
+    .select(
+      "id, title, description, pillar_id, frequency, current_streak, times_per_day"
+    )
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("current_streak", { ascending: false });
+
+  // Fetch Today's Quests
+  const today = new Date().toISOString().split("T")[0];
+  const { data: quests } = await supabase
+    .from("user_daily_quests")
+    .select(
+      `
+      id, status, completed_at,
+      challenges(id, title, description, pillar_id, difficulty, xp_reward)
+    `
+    )
+    .eq("user_id", userId)
+    .eq("assigned_date", today);
+
+  // Build context string
+  let context = `USER PROFILE:
+- Name: ${profile.display_name}
+- Class: ${profile.user_class}
+- Level: ${profile.level} (${profile.total_xp} XP)
+- Current Streak: ${profile.current_streak} days 🔥
+- Pillar Scores: ${JSON.stringify(profile.pillar_scores)}
+- Weakest Pillar: ${getWeakestPillar(profile.pillar_scores)}
+- Strongest Pillar: ${getStrongestPillar(profile.pillar_scores)}
+
+LIFE PATHS (Long-term Goals):
+${
+  lifePaths && lifePaths.length > 0
+    ? lifePaths
+        .map(
+          (lp: any) => `
+  • ${lp.title} (${lp.pillar_id}) - ${lp.progress_percentage || 0}% complete
+    Vision: ${lp.vision_statement || "N/A"}
+    Status: ${lp.status}
+    Target: ${lp.target_date || "Not set"}
+    Milestones:
+${
+  lp.path_milestones && lp.path_milestones.length > 0
+    ? lp.path_milestones
+        .map(
+          (m: any) =>
+            `      - ${m.title} (${m.status})${
+              m.completed_date ? ` ✅ Completed: ${m.completed_date}` : ""
+            }`
+        )
+        .join("\n")
+    : "      (No milestones yet)"
+}
+`
+        )
+        .join("\n")
+    : "(No Life Paths created yet)"
+}
+
+ACTIVE HABITS:
+${
+  habits && habits.length > 0
+    ? habits
+        .map(
+          (h: any) => `
+  • ${h.title} (${h.pillar_id}) - ${h.frequency}, ${h.times_per_day}x/day
+    Streak: ${h.current_streak} days 🔥
+    ${h.description || ""}
+`
+        )
+        .join("\n")
+    : "(No active habits)"
+}
+
+TODAY'S QUESTS:
+${
+  quests && quests.length > 0
+    ? quests
+        .map(
+          (q: any) => `
+  • ${q.challenges?.title || "Unknown"} (${q.challenges?.pillar_id || "N/A"})
+    Status: ${q.status} ${q.status === "completed" ? "✅" : "⏳"}
+    ${q.challenges?.description || ""}
+`
+        )
+        .join("\n")
+    : "(No quests assigned today)"
+}
+
+Today's date: ${new Date().toLocaleDateString("es-ES")}`;
+
+  return context;
 }
 
 async function getUserCalendarEvents(
@@ -374,36 +592,164 @@ async function saveGeneratedQuests(userId: string, quests: GeneratedQuest[]) {
   const today = new Date().toISOString().split("T")[0];
 
   for (const quest of quests) {
-    // First, insert the challenge
-    const { data: challenge, error: challengeError } = await supabase
-      .from("challenges")
-      .insert({
-        title: quest.title,
-        description: quest.description,
-        pillar_id: quest.pillar_id,
-        difficulty: quest.difficulty,
-        xp_reward: quest.xp_reward,
-        coin_reward: quest.coin_reward,
-        duration_minutes: quest.duration_minutes,
-        icon: quest.icon,
-        is_daily: true,
-        is_ai_generated: true,
-      })
-      .select("id")
-      .single();
+    try {
+      // First, insert the challenge
+      const { data: challenge, error: challengeError } = await supabase
+        .from("challenges")
+        .insert({
+          title: quest.title,
+          description: quest.description,
+          pillar_id: quest.pillar_id,
+          difficulty: quest.difficulty,
+          xp_reward: quest.xp_reward,
+          coin_reward: quest.coin_reward,
+          duration_minutes: quest.duration_minutes,
+          icon: quest.icon,
+          is_daily: true,
+          tags: ["ai_generated"],
+        })
+        .select("id")
+        .single();
 
-    if (challengeError) {
-      console.error("Failed to create challenge:", challengeError);
-      continue;
+      if (challengeError) {
+        console.error("Failed to create challenge:", challengeError);
+        continue;
+      }
+
+      // Then assign to user
+      const { error: assignError } = await supabase
+        .from("user_daily_quests")
+        .insert({
+          user_id: userId,
+          daily_quest_id: challenge.id,
+          assigned_date: today,
+        });
+
+      if (assignError) {
+        console.error("Failed to assign quest to user:", assignError);
+      }
+    } catch (err) {
+      console.error("Error in saveGeneratedQuests:", err);
     }
+  }
+}
 
-    // Then assign to user
-    await supabase.from("user_daily_quests").insert({
-      user_id: userId,
-      daily_quest_id: challenge.id,
-      assigned_date: today,
-      ai_reason: quest.why_this_quest,
-    });
+async function saveGeneratedLifePaths(
+  userId: string,
+  lifePaths: GeneratedLifePath[]
+): Promise<string[]> {
+  const createdIds: string[] = [];
+
+  for (const path of lifePaths) {
+    try {
+      // Create Life Path
+      const { data: pathData, error: pathError } = await supabase
+        .from("life_paths")
+        .insert({
+          user_id: userId,
+          title: path.title,
+          description: path.description,
+          pillar_id: path.pillar_id,
+          vision_statement: path.vision_statement,
+          why_important: path.why_important,
+          target_date: path.target_date,
+          status: "active",
+          ai_generated: true,
+        })
+        .select("id")
+        .single();
+
+      if (pathError) {
+        console.error("Failed to create life path:", pathError);
+        createdIds.push(""); // Push empty string to maintain index alignment
+        continue;
+      }
+
+      createdIds.push(pathData.id);
+
+      // Create Milestones
+      if (path.milestones && path.milestones.length > 0) {
+        const milestonesToInsert = path.milestones.map((m, index) => ({
+          life_path_id: pathData.id,
+          user_id: userId,
+          title: m.title,
+          target_date: m.target_date,
+          sort_order: index,
+          status: "pending",
+          ai_suggested: true,
+        }));
+
+        const { error: milestoneError } = await supabase
+          .from("path_milestones")
+          .insert(milestonesToInsert);
+
+        if (milestoneError) {
+          console.error("Failed to create milestones:", milestoneError);
+        }
+      }
+    } catch (err) {
+      console.error("Error in saveGeneratedLifePaths:", err);
+      createdIds.push("");
+    }
+  }
+  return createdIds;
+}
+
+async function saveGeneratedHabits(
+  userId: string,
+  habits: GeneratedHabit[],
+  createdPathIds: string[] = []
+) {
+  for (const habit of habits) {
+    try {
+      let linkedPathId = null;
+
+      // Try to link to a life path if index is provided and we have a valid ID
+      if (
+        habit.life_path_index !== undefined &&
+        habit.life_path_index >= 0 &&
+        createdPathIds[habit.life_path_index]
+      ) {
+        linkedPathId = createdPathIds[habit.life_path_index];
+      }
+
+      // Create Habit
+      const { data: habitData, error: habitError } = await supabase
+        .from("habits")
+        .insert({
+          user_id: userId,
+          title: habit.title,
+          description: habit.description,
+          pillar_id: habit.pillar_id,
+          frequency: habit.frequency,
+          times_per_day: habit.times_per_day,
+          is_active: true,
+          is_ai_suggested: true,
+        })
+        .select("id")
+        .single();
+
+      if (habitError) {
+        console.error("Failed to create habit:", habitError);
+        continue;
+      }
+
+      // If linked to a path, create the link in path_habits
+      if (linkedPathId) {
+        await supabase.from("path_habits").insert({
+          life_path_id: linkedPathId,
+          user_id: userId,
+          habit_id: habitData.id,
+          title: habit.title,
+          description: habit.description,
+          pillar_id: habit.pillar_id,
+          frequency: habit.frequency,
+          target_per_period: habit.times_per_day,
+        });
+      }
+    } catch (err) {
+      console.error("Error in saveGeneratedHabits:", err);
+    }
   }
 }
 
@@ -442,6 +788,313 @@ function getMoodResponse(mood: string): string {
 }
 
 // =====================================================
+// ASSESSMENT ANALYSIS WITH AI
+// =====================================================
+
+export interface GeneratedLifePath {
+  title: string;
+  description: string;
+  pillar_id: string;
+  vision_statement: string;
+  why_important: string;
+  target_date: string; // YYYY-MM-DD
+  milestones: {
+    title: string;
+    target_date: string;
+  }[];
+}
+
+export interface GeneratedHabit {
+  title: string;
+  description: string;
+  pillar_id: string;
+  frequency: "daily" | "weekly";
+  times_per_day: number;
+  life_path_index?: number; // Index in the life_paths array, if linked
+}
+
+export interface AssessmentAnalysis {
+  pillar_scores: Record<string, number>;
+  personality_summary: string;
+  strengths: string[];
+  areas_to_improve: string[];
+  recommended_class: string;
+  personalized_goals: string[];
+  initial_quests: GeneratedQuest[];
+  life_paths: GeneratedLifePath[];
+  habits: GeneratedHabit[];
+  coach_welcome_message: string;
+}
+
+interface AssessmentQuestion {
+  id: string;
+  pillar: string;
+  question_text: string;
+  question_type: string;
+  options: string[] | null;
+}
+
+interface AssessmentAnswer {
+  question_id: string;
+  answer_value?: number;
+  answer_choice?: string;
+  answer_choices?: string[];
+}
+
+/**
+ * Analyze user's assessment with AI to generate personalized profile
+ */
+export async function analyzeAssessmentWithAI(
+  questions: AssessmentQuestion[],
+  answers: Record<string, AssessmentAnswer>,
+  userName?: string,
+  language: string = "es"
+): Promise<AssessmentAnalysis> {
+  // Build a readable summary of Q&A
+  const qaSummary = questions
+    .map((q) => {
+      const answer = answers[q.id];
+      let answerText = "No answer";
+
+      if (answer) {
+        if (answer.answer_value !== undefined) {
+          answerText = `${answer.answer_value}/100`;
+        } else if (answer.answer_choice) {
+          answerText = answer.answer_choice;
+        } else if (answer.answer_choices && answer.answer_choices.length > 0) {
+          answerText = answer.answer_choices.join(", ");
+        }
+      }
+
+      return `[${q.pillar.toUpperCase()}] ${q.question_text}\n→ ${answerText}`;
+    })
+    .join("\n\n");
+
+  const langInstruction =
+    language === "es"
+      ? "IMPORTANTE: Responde COMPLETAMENTE en español. Todos los textos, resúmenes, fortalezas, metas y mensajes deben estar en español."
+      : "Respond in English.";
+
+  const prompt = `You are analyzing a personality assessment for a gamified self-improvement app called Quest.
+
+${langInstruction}
+
+Based on these questions and answers, create a detailed analysis:
+
+ASSESSMENT RESPONSES:
+${qaSummary}
+
+Analyze this and return JSON with:
+{
+  "pillar_scores": {
+    "physical": 0-100,
+    "mental": 0-100,
+    "social": 0-100,
+    "professional": 0-100,
+    "spiritual": 0-100,
+    "creative": 0-100
+  },
+  "personality_summary": "2-3 sentence summary of who they are and their current life situation",
+  "strengths": ["3-4 key strengths based on high scores"],
+  "areas_to_improve": ["3-4 areas they need to work on based on low scores"],
+  "recommended_class": "warrior|sage|connector|creator|achiever|monk - pick the best fit",
+  "personalized_goals": ["3-5 specific goals tailored to their profile"],
+  "initial_quests": [
+    {
+      "title": "First quest title",
+      "description": "What to do",
+      "pillar_id": "the pillar it helps",
+      "difficulty": "easy",
+      "xp_reward": 20,
+      "coin_reward": 5,
+      "duration_minutes": 15,
+      "icon": "emoji",
+      "why_this_quest": "Why this is perfect for them specifically"
+    }
+  ],
+  "life_paths": [
+    {
+      "title": "Long term goal title (e.g. Master a New Language)",
+      "description": "Short description",
+      "pillar_id": "mental",
+      "vision_statement": "I see myself speaking fluently...",
+      "why_important": "It matters because...",
+      "target_date": "YYYY-MM-DD (approx 3-6 months from now)",
+      "milestones": [
+        { "title": "Learn basic vocabulary", "target_date": "YYYY-MM-DD" },
+        { "title": "Hold a 5 min conversation", "target_date": "YYYY-MM-DD" },
+        { "title": "Read a children's book", "target_date": "YYYY-MM-DD" }
+      ]
+    }
+  ],
+  "habits": [
+    {
+      "title": "Habit title",
+      "description": "Habit description",
+      "pillar_id": "mental",
+      "frequency": "daily",
+      "times_per_day": 1,
+      "life_path_index": 0 // Optional: index of the life_path this habit supports. -1 if standalone.
+    }
+  ],
+  "coach_welcome_message": "A warm, personalized welcome message from Quest (the AI coach) addressing them by name${
+    userName ? ` (${userName})` : ""
+  } and acknowledging their specific situation"
+}
+
+Generate:
+1. 5 initial quests targeting their weakest areas.
+2. 2 Life Paths (Long term goals) based on their aspirations. Make sure they are distinct and NOT generic.
+3. Each Life Path MUST have 3-5 sequential milestones (small steps to reach the goal).
+4. 3 Habits (some linked to Life Paths, some standalone for general wellbeing).
+
+Be specific and personal - reference their actual answers.
+The welcome message should feel like a real coach who understands them.`;
+
+  const messages: CoachMessage[] = [
+    { role: "system", content: prompt },
+    { role: "user", content: "Analyze my assessment and create my profile." },
+  ];
+
+  try {
+    const response = await callOpenAI(messages, {
+      temperature: 0.7,
+      max_tokens: 2500,
+      json_mode: true,
+    });
+
+    const analysis = JSON.parse(response) as AssessmentAnalysis;
+    return analysis;
+  } catch (error) {
+    console.error("AI Assessment analysis failed:", error);
+    // Return fallback analysis if AI fails
+    return generateFallbackAnalysis(questions, answers);
+  }
+}
+
+/**
+ * Fallback if AI fails - calculate scores locally
+ */
+function generateFallbackAnalysis(
+  questions: AssessmentQuestion[],
+  answers: Record<string, AssessmentAnswer>
+): AssessmentAnalysis {
+  const pillarScores: Record<string, number> = {};
+  const pillarCounts: Record<string, number> = {};
+
+  for (const question of questions) {
+    const answer = answers[question.id];
+    if (!answer) continue;
+
+    const pillar = question.pillar;
+    if (!pillarScores[pillar]) {
+      pillarScores[pillar] = 0;
+      pillarCounts[pillar] = 0;
+    }
+
+    if (answer.answer_value !== undefined) {
+      pillarScores[pillar] += answer.answer_value;
+      pillarCounts[pillar]++;
+    } else if (answer.answer_choice) {
+      const options = question.options || [];
+      const index = options.indexOf(answer.answer_choice);
+      pillarScores[pillar] += (index + 1) * 20;
+      pillarCounts[pillar]++;
+    } else if (answer.answer_choices && answer.answer_choices.length > 0) {
+      pillarScores[pillar] += Math.min(answer.answer_choices.length * 20, 100);
+      pillarCounts[pillar]++;
+    }
+  }
+
+  const scores: Record<string, number> = {};
+  for (const pillar of Object.keys(pillarScores)) {
+    scores[pillar] = Math.round(
+      pillarScores[pillar] / (pillarCounts[pillar] || 1)
+    );
+  }
+
+  // Find weakest and strongest
+  const entries = Object.entries(scores);
+  const weakest =
+    entries.length > 0
+      ? entries.reduce((a, b) => (a[1] < b[1] ? a : b))[0]
+      : "physical";
+  const strongest =
+    entries.length > 0
+      ? entries.reduce((a, b) => (a[1] > b[1] ? a : b))[0]
+      : "mental";
+
+  return {
+    pillar_scores: scores,
+    personality_summary:
+      "You're on a journey of self-improvement. Let's work together to unlock your potential!",
+    strengths: [`Strong in ${strongest}`, "Committed to growth", "Self-aware"],
+    areas_to_improve: [
+      `Focus on ${weakest}`,
+      "Build consistency",
+      "Set specific goals",
+    ],
+    recommended_class:
+      strongest === "physical"
+        ? "warrior"
+        : strongest === "mental"
+        ? "sage"
+        : strongest === "social"
+        ? "connector"
+        : strongest === "creative"
+        ? "creator"
+        : strongest === "professional"
+        ? "achiever"
+        : "monk",
+    personalized_goals: [
+      `Improve your ${weakest} score`,
+      "Build a daily routine",
+      "Complete your first week of quests",
+    ],
+    initial_quests: [
+      {
+        title: "Morning Mindfulness",
+        description: "Start your day with 5 minutes of deep breathing",
+        pillar_id: "spiritual",
+        difficulty: "easy",
+        xp_reward: 15,
+        coin_reward: 3,
+        duration_minutes: 5,
+        icon: "🧘",
+        why_this_quest: "A gentle start to build your daily habit",
+      },
+    ],
+    life_paths: [],
+    habits: [],
+    coach_welcome_message:
+      "Hey there! I'm Quest, your personal AI coach. I've analyzed your assessment and I'm excited to help you grow. Let's start this journey together! 🚀",
+  };
+}
+
+// =====================================================
+// SIMPLE TEXT GENERATION
+// =====================================================
+
+/**
+ * Simple text generation for one-off prompts
+ * Used for analyzing achievements, generating descriptions, etc.
+ */
+export async function generateText(
+  prompt: string,
+  options: {
+    temperature?: number;
+    max_tokens?: number;
+    json_mode?: boolean;
+  } = {}
+): Promise<string> {
+  return callOpenAI([{ role: "user", content: prompt }], {
+    temperature: 0.5,
+    max_tokens: 500,
+    ...options,
+  });
+}
+
+// =====================================================
 // EXPORTS
 // =====================================================
 
@@ -450,6 +1103,10 @@ export const questAI = {
   generateQuests: generatePersonalizedQuests,
   getMorningPlan,
   saveGeneratedQuests,
+  saveGeneratedLifePaths,
+  saveGeneratedHabits,
+  analyzeAssessment: analyzeAssessmentWithAI,
+  generateText,
 };
 
 export default questAI;
