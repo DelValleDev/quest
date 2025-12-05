@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
+import { t } from '../../lib/i18n';
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,23 +20,23 @@ interface OnboardingSlide {
   emoji: string;
 }
 
-const slides: OnboardingSlide[] = [
+const getSlides = (): OnboardingSlide[] => [
   {
     id: 1,
-    title: 'Your Life is the Quest',
-    subtitle: 'Transform your daily habits into an epic adventure. Level up every aspect of your life.',
+    title: t('onboarding.slides.slide1.title'),
+    subtitle: t('onboarding.slides.slide1.subtitle'),
     emoji: '🎮',
   },
   {
     id: 2,
-    title: 'AI Coach Guides You',
-    subtitle: 'Quest, your personal AI companion, creates a custom plan to become your best self.',
+    title: t('onboarding.slides.slide2.title'),
+    subtitle: t('onboarding.slides.slide2.subtitle'),
     emoji: '🤖',
   },
   {
     id: 3,
-    title: 'Friends Are Your Allies',
-    subtitle: 'Challenge friends, join raids, and hold each other accountable with real stakes.',
+    title: t('onboarding.slides.slide3.title'),
+    subtitle: t('onboarding.slides.slide3.subtitle'),
     emoji: '⚔️',
   },
 ];
@@ -48,6 +49,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) =>
   const [currentSlide, setCurrentSlide] = React.useState(0);
   const { mode } = useThemeStore();
   const theme = getTheme(mode);
+  const slides = getSlides();
 
   const handleNext = () => {
     if (currentSlide < slides.length - 1) {
@@ -97,7 +99,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) =>
         activeOpacity={0.8}
       >
         <Text style={styles.buttonText}>
-          {currentSlide < slides.length - 1 ? 'Next' : 'Get Started'}
+          {currentSlide < slides.length - 1 ? t('common.next') : t('onboarding.getStarted')}
         </Text>
       </TouchableOpacity>
 
@@ -105,7 +107,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) =>
       {currentSlide < slides.length - 1 && (
         <TouchableOpacity onPress={onGetStarted} style={styles.skipButton}>
           <Text style={[styles.skipText, { color: theme.textMuted }]}>
-            Skip
+            {t('onboarding.skip')}
           </Text>
         </TouchableOpacity>
       )}

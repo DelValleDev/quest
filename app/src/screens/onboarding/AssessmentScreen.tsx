@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,61 +8,363 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useThemeStore, useAuthStore } from '../../store';
+import { useThemeStore, useAuthStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useNavigation } from '@react-navigation/native';
+import { questAI } from '../../lib/openai';
+import { t } from '../../lib/i18n';
 
 const { width } = Dimensions.get('window');
+const SLIDER_WIDTH = width - 80; // Total slider width (accounting for padding)
 
 interface Question {
   id: string;
   pillar: string;
   question_text: string;
+  question_text_en?: string; // English translation
   question_type: 'slider' | 'single_choice' | 'multiple_choice';
   options: string[] | null;
+  options_en?: string[] | null; // English options
   sort_order: number;
 }
 
-const PILLAR_INFO: Record<string, { emoji: string; name: string; color: string }> = {
-  physical: { emoji: '💪', name: 'Físico', color: '#EF4444' },
+// Pillar info with translations
+const getPillarInfo = (lang: 'en' | 'es'): Record<string, { emoji: string; name: string; color: string }> => ({
+  physical: { emoji: '💪', name: lang === 'es' ? 'Físico' : 'Physical', color: '#EF4444' },
   mental: { emoji: '🧠', name: 'Mental', color: '#3B82F6' },
   social: { emoji: '❤️', name: 'Social', color: '#EC4899' },
-  professional: { emoji: '💰', name: 'Profesional', color: '#10B981' },
-  spiritual: { emoji: '🕉️', name: 'Espiritual', color: '#8B5CF6' },
-  creative: { emoji: '🎨', name: 'Creativo', color: '#F97316' },
+  professional: { emoji: '💰', name: lang === 'es' ? 'Profesional' : 'Professional', color: '#10B981' },
+  spiritual: { emoji: '🕉️', name: lang === 'es' ? 'Espiritual' : 'Spiritual', color: '#8B5CF6' },
+  creative: { emoji: '🎨', name: lang === 'es' ? 'Creativo' : 'Creative', color: '#F97316' },
+});
+
+// Custom Draggable Slider Component
+interface DraggableSliderProps {
+  value: number;
+  onValueChange: (value: number) => void;
+  primaryColor: string;
+  trackColor: string;
+  onSlideStart?: () => void;
+  onSlideEnd?: () => void;
+}
+
+const DraggableSlider: React.FC<DraggableSliderProps> = ({
+  value,
+  onValueChange,
+  primaryColor,
+  trackColor,
+  onSlideStart,
+  onSlideEnd,
+}) => {
+  const sliderRef = useRef<View>(null);
+  const sliderXRef = useRef(0);
+  
+  // Store callbacks in refs so PanResponder always has latest
+  const onSlideStartRef = useRef(onSlideStart);
+  const onSlideEndRef = useRef(onSlideEnd);
+  const onValueChangeRef = useRef(onValueChange);
+  
+  // Update refs when props change
+  useEffect(() => {
+    onSlideStartRef.current = onSlideStart;
+    onSlideEndRef.current = onSlideEnd;
+    onValueChangeRef.current = onValueChange;
+  }, [onSlideStart, onSlideEnd, onValueChange]);
+  
+  // Calculate value from position
+  const calculateValue = useCallback((pageX: number) => {
+    const position = pageX - sliderXRef.current;
+    const clampedPosition = Math.max(0, Math.min(position, SLIDER_WIDTH));
+    const newValue = Math.round((clampedPosition / SLIDER_WIDTH) * 100);
+    return newValue;
+  }, []);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      // Capture horizontal gestures more aggressively
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Always capture if moving horizontally more than vertically
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 0.5 || Math.abs(gestureState.dx) > 3;
+      },
+      onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+        // Capture the gesture before ScrollView if moving horizontally
+        return Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 0.5 || Math.abs(gestureState.dx) > 3;
+      },
+      onPanResponderGrant: (evt) => {
+        // Notify parent to disable scroll via ref
+        onSlideStartRef.current?.();
+        // Get the slider position when touch starts
+        sliderRef.current?.measure((x, y, w, h, pageX, pageY) => {
+          sliderXRef.current = pageX;
+          const newValue = calculateValue(evt.nativeEvent.pageX);
+          onValueChangeRef.current(newValue);
+        });
+      },
+      onPanResponderMove: (evt) => {
+        const newValue = calculateValue(evt.nativeEvent.pageX);
+        onValueChangeRef.current(newValue);
+      },
+      onPanResponderRelease: (evt) => {
+        const newValue = calculateValue(evt.nativeEvent.pageX);
+        onValueChangeRef.current(newValue);
+        // Notify parent to enable scroll again via ref
+        onSlideEndRef.current?.();
+      },
+      onPanResponderTerminate: () => {
+        // Also enable scroll if gesture is terminated
+        onSlideEndRef.current?.();
+      },
+    })
+  ).current;
+
+  // Update slider position reference on layout
+  const handleLayout = () => {
+    sliderRef.current?.measure((x, y, w, h, pageX, pageY) => {
+      sliderXRef.current = pageX;
+    });
+  };
+
+  return (
+    <View style={sliderStyles.container}>
+      <Text style={[sliderStyles.valueText, { color: primaryColor }]}>
+        {value}
+      </Text>
+      <View
+        ref={sliderRef}
+        onLayout={handleLayout}
+        style={[sliderStyles.track, { backgroundColor: trackColor }]}
+        {...panResponder.panHandlers}
+      >
+        <View
+          style={[
+            sliderStyles.fill,
+            {
+              width: `${value}%`,
+              backgroundColor: primaryColor,
+            },
+          ]}
+        />
+        <View
+          style={[
+            sliderStyles.thumb,
+            {
+              left: `${value}%`,
+              backgroundColor: primaryColor,
+            },
+          ]}
+        />
+      </View>
+      <View style={sliderStyles.labels}>
+        <Text style={[sliderStyles.label, { color: trackColor }]}>0</Text>
+        <Text style={[sliderStyles.label, { color: trackColor }]}>50</Text>
+        <Text style={[sliderStyles.label, { color: trackColor }]}>100</Text>
+      </View>
+    </View>
+  );
 };
 
-export const AssessmentScreen: React.FC = () => {
+const sliderStyles = StyleSheet.create({
+  container: {
+    marginVertical: 20,
+  },
+  valueText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  track: {
+    height: 12,
+    borderRadius: 6,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  fill: {
+    position: 'absolute',
+    left: 0,
+    height: '100%',
+    borderRadius: 6,
+  },
+  thumb: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginLeft: -16,
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  labels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+});
+
+interface AssessmentScreenProps {
+  onBackToSetup?: () => void;
+}
+
+export const AssessmentScreen: React.FC<AssessmentScreenProps> = ({ onBackToSetup }) => {
   const { mode } = useThemeStore();
   const { user } = useAuthStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation();
+  
+  // Translation helper
+  const PILLAR_INFO = getPillarInfo(language);
+
+  // Get translated question text
+  const getQuestionText = (q: Question): string => {
+    if (language === 'en' && q.question_text_en) {
+      return q.question_text_en;
+    }
+    return q.question_text;
+  };
+
+  // Get translated options
+  const getQuestionOptions = (q: Question): string[] | null => {
+    if (language === 'en' && q.options_en) {
+      return q.options_en;
+    }
+    return q.options;
+  };
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [surveyLength, setSurveyLength] = useState<string>('complete');
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   useEffect(() => {
     fetchQuestions();
   }, []);
 
-  const fetchQuestions = async () => {
+  // Load saved progress AFTER questions are loaded
+  useEffect(() => {
+    if (questions.length > 0 && user?.id) {
+      loadSavedProgress();
+    }
+  }, [questions]);
+
+  // Load previously saved answers and current index if user went back and returned
+  const loadSavedProgress = async () => {
+    if (!user?.id || questions.length === 0) return;
     try {
-      const { data, error } = await supabase
+      // Load saved answers
+      const { data: savedAnswers } = await supabase
+        .from('user_assessment_answers')
+        .select('question_id, answer_value, answer_choice, answer_choices')
+        .eq('user_id', user.id);
+
+      // Also try to load saved index from profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('assessment_current_index')
+        .eq('id', user.id)
+        .single();
+      
+      if (savedAnswers && savedAnswers.length > 0) {
+        const restoredAnswers: Record<string, any> = {};
+        savedAnswers.forEach((ans) => {
+          restoredAnswers[ans.question_id] = {
+            answer_value: ans.answer_value,
+            answer_choice: ans.answer_choice,
+            answer_choices: ans.answer_choices,
+          };
+        });
+        setAnswers(restoredAnswers);
+
+        // Use saved index from profile if available, otherwise calculate from answers
+        let resumeIndex = 0;
+        
+        if (profile?.assessment_current_index !== undefined && profile.assessment_current_index !== null) {
+          // Use the saved index directly
+          resumeIndex = profile.assessment_current_index;
+        } else {
+          // Fallback: find the first question without an answer
+          for (let i = 0; i < questions.length; i++) {
+            if (restoredAnswers[questions[i].id]) {
+              resumeIndex = i + 1; // Move to next question after last answered
+            } else {
+              break; // Found first unanswered question
+            }
+          }
+        }
+        
+        // Don't go past the last question
+        if (resumeIndex >= questions.length) {
+          resumeIndex = questions.length - 1;
+        }
+        setCurrentIndex(resumeIndex);
+      }
+    } catch (err) {
+      console.log('No saved progress found');
+    }
+  };
+
+  const fetchQuestions = async () => {
+    setLoading(true);
+    try {
+      // Get user's survey length preference
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('survey_length_preference')
+        .eq('id', user?.id)
+        .single();
+      
+      const preference = profile?.survey_length_preference || 'complete';
+      setSurveyLength(preference);
+      
+      // Determine priority filter based on preference
+      // Short: core only (2 per pillar = 12)
+      // Medium: core + extended (4 per pillar = 24)
+      // Complete: all questions
+      let priorityFilter: string[] = [];
+      if (preference === 'short') {
+        priorityFilter = ['core'];
+      } else if (preference === 'medium') {
+        priorityFilter = ['core', 'extended'];
+      }
+      // complete = no filter, get all
+
+      let query = supabase
         .from('assessment_questions')
         .select('*')
         .order('sort_order');
+      
+      // Apply priority filter if not complete
+      if (priorityFilter.length > 0) {
+        query = query.in('priority', priorityFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setQuestions(data || []);
     } catch (err) {
       console.error('Error fetching questions:', err);
-      Alert.alert('Error', 'Failed to load assessment questions');
+      Alert.alert(t('common.error'), t('errors.loadQuestions'));
     } finally {
       setLoading(false);
     }
@@ -73,20 +375,61 @@ export const AssessmentScreen: React.FC = () => {
   const currentPillar = currentQuestion?.pillar;
   const pillarInfo = currentPillar ? PILLAR_INFO[currentPillar] : null;
 
+  // Exclusive options (if selected, deselect others)
+  // Only exact patterns that indicate "none of the above" type options
+  const isExclusiveOption = (option: string) => {
+    const lowerOption = option.toLowerCase().trim();
+    // Must be a standalone exclusive phrase, not part of another word
+    const exclusivePhrases = [
+      'ninguno todavía',
+      'ninguna todavía', 
+      'ninguno',
+      'ninguna',
+      'nada en particular',
+      'ninguna en particular',
+      'estoy bien',
+      'voy por buen camino',
+      'none',
+      'nothing in particular',
+    ];
+    // Check if the option IS one of these exclusive phrases (starts with)
+    return exclusivePhrases.some(phrase => lowerOption.startsWith(phrase) || lowerOption === phrase);
+  };
+
   const handleAnswer = (value: any) => {
     const questionId = currentQuestion.id;
     
     if (currentQuestion.question_type === 'multiple_choice') {
-      // Toggle selection
       const current = (answers[questionId]?.answer_choices || []) as string[];
-      const newChoices = current.includes(value)
-        ? current.filter((c) => c !== value)
-        : [...current, value];
       
-      setAnswers({
-        ...answers,
-        [questionId]: { answer_choices: newChoices },
-      });
+      // Check if this is an exclusive option
+      if (isExclusiveOption(value)) {
+        // If clicking exclusive, only select that one
+        if (current.includes(value)) {
+          // Deselecting exclusive option
+          setAnswers({
+            ...answers,
+            [questionId]: { answer_choices: [] },
+          });
+        } else {
+          // Selecting exclusive option - clear others
+          setAnswers({
+            ...answers,
+            [questionId]: { answer_choices: [value] },
+          });
+        }
+      } else {
+        // Regular option - remove any exclusive options when selecting
+        const currentWithoutExclusive = current.filter(c => !isExclusiveOption(c));
+        const newChoices = currentWithoutExclusive.includes(value)
+          ? currentWithoutExclusive.filter((c) => c !== value)
+          : [...currentWithoutExclusive, value];
+        
+        setAnswers({
+          ...answers,
+          [questionId]: { answer_choices: newChoices },
+        });
+      }
     } else if (currentQuestion.question_type === 'single_choice') {
       setAnswers({
         ...answers,
@@ -116,7 +459,7 @@ export const AssessmentScreen: React.FC = () => {
 
   const handleNext = async () => {
     if (!canProceed()) {
-      Alert.alert('Respuesta requerida', 'Por favor selecciona una opción');
+      Alert.alert(t('assessment.answerRequired'), t('assessment.selectOption'));
       return;
     }
 
@@ -150,52 +493,158 @@ export const AssessmentScreen: React.FC = () => {
     }
   };
 
+  // Go back to setup - saves progress first
+  const handleBackToSetup = async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Save current answers before going back
+      const answersToSave = Object.entries(answers).map(([questionId, answer]) => ({
+        user_id: user.id,
+        question_id: questionId,
+        answer_value: answer.answer_value || null,
+        answer_choice: answer.answer_choice || null,
+        answer_choices: answer.answer_choices || null,
+      }));
+
+      if (answersToSave.length > 0) {
+        await supabase
+          .from('user_assessment_answers')
+          .upsert(answersToSave, { onConflict: 'user_id,question_id' });
+      }
+
+      // Also save current question index to profiles
+      await supabase
+        .from('profiles')
+        .update({ assessment_current_index: currentIndex })
+        .eq('id', user.id);
+    } catch (err) {
+      console.log('Error saving progress:', err);
+    }
+
+    // Go back to setup
+    if (onBackToSetup) {
+      onBackToSetup();
+    }
+  };
+
+  const [analysisStatus, setAnalysisStatus] = useState<string>('');
+
   const finishAssessment = async () => {
     setSubmitting(true);
     try {
-      // Calculate pillar scores
-      const { data: scores, error: scoresError } = await supabase.rpc(
-        'calculate_pillar_scores',
-        { p_user_id: user?.id }
+      // Get user profile for name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', user?.id)
+        .single();
+
+      setAnalysisStatus(t('assessment.analyzingAI'));
+
+      // Use AI to analyze assessment (pass language for proper response)
+      const analysis = await questAI.analyzeAssessment(
+        questions,
+        answers,
+        profile?.display_name || undefined,
+        language // Pass language so AI responds in correct language
       );
 
-      if (scoresError) throw scoresError;
+      setAnalysisStatus(t('assessment.savingProfile'));
 
-      // Update profile with assessment completion
+      // Update profile with AI-analyzed data
       const { error: updateError } = await supabase
         .from('profiles')
         .update({
           assessment_completed: true,
-          has_completed_assessment: true, // Mark for onboarding flow
-          pillar_scores: scores,
+          pillar_scores: analysis.pillar_scores,
+          personality_summary: analysis.personality_summary,
+          strengths: analysis.strengths,
+          areas_to_improve: analysis.areas_to_improve,
+          recommended_class: analysis.recommended_class,
+          user_class: analysis.recommended_class, // Auto-set class from AI recommendation
+          personalized_goals: analysis.personalized_goals,
+          coach_welcome_message: analysis.coach_welcome_message,
           updated_at: new Date().toISOString(),
         })
         .eq('id', user?.id);
 
-      if (updateError) throw updateError;
-
-      // Initialize user availability for calendar
-      try {
-        await supabase.rpc('initialize_user_availability', { p_user_id: user?.id });
-      } catch (e) {
-        console.warn('Could not initialize availability:', e);
+      if (updateError) {
+        console.warn('Some profile fields may not exist:', updateError);
+        // Fallback: just save pillar_scores and class if other columns don't exist
+        await supabase
+          .from('profiles')
+          .update({
+            assessment_completed: true,
+            pillar_scores: analysis.pillar_scores,
+            user_class: analysis.recommended_class,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user?.id);
       }
 
+      // Save initial quests from AI
+      if (analysis.initial_quests && analysis.initial_quests.length > 0) {
+        setAnalysisStatus(t('assessment.creatingQuests'));
+        try {
+          await questAI.saveGeneratedQuests(user?.id || '', analysis.initial_quests);
+        } catch (e) {
+          console.warn('Could not save initial quests:', e);
+        }
+      }
+
+      // Save Life Paths from AI
+      let createdPathIds: string[] = [];
+      if (analysis.life_paths && analysis.life_paths.length > 0) {
+        setAnalysisStatus(t('assessment.designingPaths'));
+        try {
+          createdPathIds = await questAI.saveGeneratedLifePaths(user?.id || '', analysis.life_paths);
+        } catch (e) {
+          console.warn('Could not save life paths:', e);
+        }
+      }
+
+      // Save Habits from AI
+      if (analysis.habits && analysis.habits.length > 0) {
+        setAnalysisStatus(t('assessment.organizingHabits'));
+        try {
+          await questAI.saveGeneratedHabits(user?.id || '', analysis.habits, createdPathIds);
+        } catch (e) {
+          console.warn('Could not save habits:', e);
+        }
+      }
+
+      // Show result and go to Main (no class selection - it's automatic now!)
+      const classNames: Record<string, string> = {
+        warrior: `${t('classes.warrior.name')} 💪`,
+        sage: `${t('classes.sage.name')} 🧠`,
+        connector: `${t('classes.connector.name')} ❤️`,
+        creator: `${t('classes.creator.name')} 🎨`,
+        achiever: `${t('classes.achiever.name')} 💼`,
+        monk: `${t('classes.monk.name')} 🕉️`,
+      };
+      
+      const assignedClass = classNames[analysis.recommended_class] || analysis.recommended_class;
+      
       Alert.alert(
-        '¡Assessment Completado! 🎉',
-        'Ahora vamos a crear tu plan personalizado basado en tu personalidad',
+        t('assessment.completedTitle'),
+        `${analysis.coach_welcome_message || t('common.success')}\n\n🏆 ${t('assessment.assignedClass')}: ${assignedClass}`,
         [
           {
-            text: 'Ver Resultados',
-            onPress: () => navigation.navigate('AssessmentResults' as never),
+            text: t('assessment.letsGo'),
+            onPress: () => navigation.reset({
+              index: 0,
+              routes: [{ name: 'Main' as never }],
+            }),
           },
         ]
       );
     } catch (err: any) {
       console.error('Error finishing assessment:', err);
-      Alert.alert('Error', err.message);
+      Alert.alert(t('common.error'), err.message || t('errors.generic'));
     } finally {
       setSubmitting(false);
+      setAnalysisStatus('');
     }
   };
 
@@ -203,6 +652,27 @@ export const AssessmentScreen: React.FC = () => {
     container: {
       flex: 1,
       backgroundColor: theme.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    headerBackBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 8,
+    },
+    headerBackIcon: {
+      fontSize: 24,
+      color: theme.primary,
+      marginRight: 4,
+    },
+    headerBackText: {
+      fontSize: 16,
+      color: theme.primary,
+      fontWeight: '600',
     },
     progressContainer: {
       paddingHorizontal: 20,
@@ -285,50 +755,6 @@ export const AssessmentScreen: React.FC = () => {
       color: theme.primary,
       fontWeight: '600',
     },
-    // Slider
-    sliderContainer: {
-      marginBottom: 20,
-    },
-    sliderTrack: {
-      height: 8,
-      backgroundColor: theme.border,
-      borderRadius: 4,
-      marginBottom: 15,
-    },
-    sliderFill: {
-      height: '100%',
-      backgroundColor: theme.primary,
-      borderRadius: 4,
-    },
-    sliderThumb: {
-      position: 'absolute',
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      backgroundColor: theme.primary,
-      top: -11,
-      marginLeft: -15,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
-      elevation: 5,
-    },
-    sliderLabels: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    sliderLabel: {
-      fontSize: 12,
-      color: theme.textSecondary,
-    },
-    sliderValue: {
-      fontSize: 32,
-      fontWeight: 'bold',
-      color: theme.primary,
-      textAlign: 'center',
-      marginBottom: 15,
-    },
     // Navigation
     navButtons: {
       flexDirection: 'row',
@@ -394,13 +820,22 @@ export const AssessmentScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with back arrow */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.headerBackBtn} onPress={handleBackToSetup}>
+          <Text style={styles.headerBackIcon}>←</Text>
+          <Text style={styles.headerBackText}>{t('common.setup')}</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }} />
+      </View>
+
       {/* Progress Bar */}
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
         <Text style={styles.progressText}>
-          Pregunta {currentIndex + 1} de {questions.length}
+          {t('assessment.question')} {currentIndex + 1} {t('assessment.of')} {questions.length}
         </Text>
       </View>
 
@@ -420,87 +855,67 @@ export const AssessmentScreen: React.FC = () => {
       )}
 
       {/* Question */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={scrollEnabled}
+      >
         <View style={styles.questionCard}>
           <Text style={styles.questionNumber}>
-            PREGUNTA {currentIndex + 1}
+            {t('assessment.question').toUpperCase()} {currentIndex + 1}
           </Text>
           <Text style={styles.questionText}>
-            {currentQuestion.question_text}
+            {getQuestionText(currentQuestion)}
           </Text>
 
           {/* Slider Type */}
           {currentQuestion.question_type === 'slider' && (
-            <View style={styles.sliderContainer}>
-              <Text style={styles.sliderValue}>
-                {currentAnswer?.answer_value ?? 50}
-              </Text>
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={(e) => {
-                  const locationX = e.nativeEvent.locationX;
-                  const containerWidth = width - 80; // padding
-                  const value = Math.round((locationX / containerWidth) * 100);
-                  handleAnswer(Math.max(0, Math.min(100, value)));
-                }}
-              >
-                <View style={styles.sliderTrack}>
-                  <View
-                    style={[
-                      styles.sliderFill,
-                      {
-                        width: `${currentAnswer?.answer_value ?? 50}%`,
-                      },
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.sliderThumb,
-                      {
-                        left: `${currentAnswer?.answer_value ?? 50}%`,
-                      },
-                    ]}
-                  />
-                </View>
-              </TouchableOpacity>
-              <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabel}>0</Text>
-                <Text style={styles.sliderLabel}>50</Text>
-                <Text style={styles.sliderLabel}>100</Text>
-              </View>
-            </View>
+            <DraggableSlider
+              value={currentAnswer?.answer_value ?? 50}
+              onValueChange={(value) => handleAnswer(value)}
+              primaryColor={pillarInfo?.color || theme.primary}
+              trackColor={theme.border}
+              onSlideStart={() => setScrollEnabled(false)}
+              onSlideEnd={() => setScrollEnabled(true)}
+            />
           )}
 
           {/* Single Choice Type */}
           {currentQuestion.question_type === 'single_choice' &&
-            currentQuestion.options?.map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={[
-                  styles.optionBtn,
-                  currentAnswer?.answer_choice === option &&
-                    styles.optionBtnSelected,
-                ]}
-                onPress={() => handleAnswer(option)}
-              >
-                <Text
+            getQuestionOptions(currentQuestion)?.map((option, idx) => {
+              // Get the original option for comparison (always use Spanish for storage)
+              const originalOption = currentQuestion.options?.[idx] || option;
+              return (
+                <TouchableOpacity
+                  key={option}
                   style={[
-                    styles.optionText,
-                    currentAnswer?.answer_choice === option &&
-                      styles.optionTextSelected,
+                    styles.optionBtn,
+                    currentAnswer?.answer_choice === originalOption &&
+                      styles.optionBtnSelected,
                   ]}
+                  onPress={() => handleAnswer(originalOption)}
                 >
-                  {option}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.optionText,
+                      currentAnswer?.answer_choice === originalOption &&
+                        styles.optionTextSelected,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
 
           {/* Multiple Choice Type */}
           {currentQuestion.question_type === 'multiple_choice' &&
-            currentQuestion.options?.map((option) => {
+            getQuestionOptions(currentQuestion)?.map((option, idx) => {
+              // Get original option for storage (always use Spanish)
+              const originalOption = currentQuestion.options?.[idx] || option;
               const selected = (
                 currentAnswer?.answer_choices || []
-              ).includes(option);
+              ).includes(originalOption);
               return (
                 <TouchableOpacity
                   key={option}
@@ -508,7 +923,7 @@ export const AssessmentScreen: React.FC = () => {
                     styles.optionBtn,
                     selected && styles.optionBtnSelected,
                   ]}
-                  onPress={() => handleAnswer(option)}
+                  onPress={() => handleAnswer(originalOption)}
                 >
                   <Text
                     style={[
@@ -527,27 +942,36 @@ export const AssessmentScreen: React.FC = () => {
 
       {/* Navigation Buttons */}
       <View style={styles.navButtons}>
-        {currentIndex > 0 && (
+        {/* Show back button only if not on first question */}
+        {currentIndex > 0 ? (
           <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-            <Text style={styles.backBtnText}>← Atrás</Text>
+            <Text style={styles.backBtnText}>← {t('common.back')}</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={styles.backBtn} />
         )}
         <TouchableOpacity
           style={[
             styles.nextBtn,
             !canProceed() && styles.nextBtnDisabled,
-            currentIndex === 0 && { flex: 1 },
           ]}
           onPress={handleNext}
           disabled={!canProceed() || submitting}
         >
-          <Text style={styles.nextBtnText}>
-            {submitting
-              ? 'Guardando...'
-              : currentIndex === questions.length - 1
-              ? 'Finalizar ✓'
-              : 'Siguiente →'}
-          </Text>
+          {submitting ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <ActivityIndicator color="#FFFFFF" size="small" />
+              <Text style={[styles.nextBtnText, { marginLeft: 8 }]}>
+                {analysisStatus || t('assessment.analyzing')}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.nextBtnText}>
+              {currentIndex === questions.length - 1
+                ? `${t('assessment.complete')} ✓`
+                : `${t('common.next')} →`}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

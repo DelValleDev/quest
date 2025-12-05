@@ -14,6 +14,7 @@ import {
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import { SocialAuth } from '../../lib/socialAuth';
 
 interface AuthScreenProps {
   onAuthSuccess: () => void;
@@ -24,6 +25,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSocialLoading, setIsSocialLoading] = useState<'google' | 'apple' | null>(null);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   
   const { mode } = useThemeStore();
@@ -83,6 +85,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
     }
   };
 
+  const handleSocialAuth = async (provider: 'google' | 'apple') => {
+    setIsSocialLoading(provider);
+    
+    try {
+      const result = provider === 'google' 
+        ? await SocialAuth.signInWithGoogle()
+        : await SocialAuth.signInWithApple();
+      
+      if (result.success) {
+        onAuthSuccess();
+      } else if (result.error && !result.error.includes('cancelado')) {
+        Alert.alert('Error', result.error);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'An error occurred');
+    } finally {
+      setIsSocialLoading(null);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.background }]}
@@ -139,6 +161,50 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             </Text>
           )}
         </TouchableOpacity>
+
+        {/* Social Login Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+          <Text style={[styles.dividerText, { color: theme.textMuted }]}>
+            o continúa con
+          </Text>
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        </View>
+
+        {/* Social Login Buttons */}
+        <View style={styles.socialButtonsContainer}>
+          <TouchableOpacity
+            style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+            onPress={() => handleSocialAuth('google')}
+            disabled={isSocialLoading !== null}
+          >
+            {isSocialLoading === 'google' ? (
+              <ActivityIndicator color={theme.text} size="small" />
+            ) : (
+              <>
+                <Text style={styles.socialIcon}>🔵</Text>
+                <Text style={[styles.socialButtonText, { color: theme.text }]}>Google</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.border }]}
+              onPress={() => handleSocialAuth('apple')}
+              disabled={isSocialLoading !== null}
+            >
+              {isSocialLoading === 'apple' ? (
+                <ActivityIndicator color={theme.text} size="small" />
+              ) : (
+                <>
+                  <Text style={styles.socialIcon}>🍎</Text>
+                  <Text style={[styles.socialButtonText, { color: theme.text }]}>Apple</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
 
         <TouchableOpacity
           style={styles.switchButton}
@@ -248,6 +314,42 @@ const styles = StyleSheet.create({
   },
   switchText: {
     fontSize: 14,
+  },
+  // Social login styles
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+  },
+  socialButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  socialIcon: {
+    fontSize: 20,
+  },
+  socialButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
   },
   // Modal styles
   modalOverlay: {

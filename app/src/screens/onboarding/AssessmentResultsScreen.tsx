@@ -442,10 +442,10 @@ export const AssessmentResultsScreen: React.FC = () => {
 
       <TouchableOpacity
         style={styles.continueBtn}
-        onPress={() => navigation.navigate('Home' as never)}
+        onPress={() => navigation.navigate('Aspirations' as never)}
       >
         <Text style={styles.continueBtnText}>
-          Continuar a Quest 🚀
+          Definir mis Metas 🎯
         </Text>
       </TouchableOpacity>
     </SafeAreaView>
