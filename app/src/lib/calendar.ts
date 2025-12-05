@@ -76,6 +76,15 @@ const discovery = {
  */
 export async function connectGoogleCalendar(userId: string): Promise<boolean> {
   try {
+    // Load expo modules first
+    await loadExpoModules();
+
+    if (!AuthSession || !AuthSession.makeRedirectUri) {
+      throw new Error(
+        "expo-auth-session not available. Please install it with: npx expo install expo-auth-session expo-web-browser"
+      );
+    }
+
     const redirectUri = AuthSession.makeRedirectUri({
       scheme: "quest",
       path: "calendar-callback",
@@ -471,12 +480,202 @@ async function saveCalendarEvents(userId: string, events: CalendarEvent[]) {
 }
 
 // =====================================================
+// GET CALENDAR STATUS
+// =====================================================
+
+export async function getCalendarStatus(
+  userId: string,
+  provider: string = "google"
+): Promise<CalendarIntegration | null> {
+  const { data, error } = await supabase
+    .from("user_calendar_integrations")
+    .select("provider, access_token, refresh_token, last_sync")
+    .eq("user_id", userId)
+    .eq("provider", provider)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    provider: data.provider as "google" | "apple" | "notion",
+    connected: !!data.access_token,
+    last_sync: data.last_sync,
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+  };
+}
+
+// =====================================================
+// AI CALENDAR FUNCTIONS
+// These functions are designed to be called by the AI
+// =====================================================
+
+export interface CreateEventParams {
+  title: string;
+  description?: string;
+  startTime: string; // ISO string or natural language
+  endTime?: string; // ISO string or natural language
+  durationMinutes?: number; // If no endTime, use duration
+  location?: string;
+  reminder?: number; // Minutes before event
+}
+
+/**
+ * Create a calendar event from AI
+ * Designed for the AI to schedule events based on user conversation
+ */
+export async function createCalendarEventFromAI(
+  userId: string,
+  params: CreateEventParams
+): Promise<{
+  success: boolean;
+  eventId?: string;
+  error?: string;
+  eventUrl?: string;
+}> {
+  try {
+    const integration = await getCalendarIntegration(userId, "google");
+
+    if (!integration?.access_token) {
+      return {
+        success: false,
+        error:
+          "Google Calendar no está conectado. Ve a Configuración para conectarlo.",
+      };
+    }
+
+    // Refresh token if needed
+    let accessToken = integration.access_token;
+    if (integration.refresh_token) {
+      try {
+        accessToken = await refreshGoogleToken(integration.refresh_token);
+        await updateAccessToken(userId, "google", accessToken);
+      } catch (e) {
+        // Continue with existing token
+      }
+    }
+
+    // Parse times
+    const startTime = new Date(params.startTime);
+    let endTime: Date;
+
+    if (params.endTime) {
+      endTime = new Date(params.endTime);
+    } else if (params.durationMinutes) {
+      endTime = new Date(
+        startTime.getTime() + params.durationMinutes * 60 * 1000
+      );
+    } else {
+      // Default 1 hour duration
+      endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+    }
+
+    const event = {
+      summary: params.title,
+      description: params.description || "Creado desde Quest App",
+      start: {
+        dateTime: startTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+      end: {
+        dateTime: endTime.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+      location: params.location,
+      reminders: {
+        useDefault: false,
+        overrides: [{ method: "popup", minutes: params.reminder || 10 }],
+      },
+    };
+
+    const response = await fetch(
+      "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || "Error al crear evento");
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      eventId: data.id,
+      eventUrl: data.htmlLink,
+    };
+  } catch (error: any) {
+    console.error("AI Calendar event creation failed:", error);
+    return {
+      success: false,
+      error: error.message || "Error desconocido al crear evento",
+    };
+  }
+}
+
+/**
+ * Get user's schedule for a specific day
+ * Useful for AI to understand user's availability
+ */
+export async function getDaySchedule(
+  userId: string,
+  date: Date = new Date()
+): Promise<{ events: CalendarEvent[]; freeSlots: FreeTimeSlot[] }> {
+  // Get events from database
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(date);
+  dayEnd.setHours(23, 59, 59, 999);
+
+  const { data: events } = await supabase
+    .from("user_calendar_events")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("start_time", dayStart.toISOString())
+    .lte("start_time", dayEnd.toISOString())
+    .order("start_time");
+
+  const calendarEvents: CalendarEvent[] = (events || []).map((e) => ({
+    id: e.external_id,
+    title: e.title,
+    description: e.description,
+    start_time: e.start_time,
+    end_time: e.end_time,
+    location: e.location,
+    is_all_day: e.is_all_day,
+    source: e.source,
+  }));
+
+  const freeSlots = await findFreeTimeSlots(userId, date);
+
+  return { events: calendarEvents, freeSlots };
+}
+
+/**
+ * Check if user has Google Calendar connected
+ */
+export async function isCalendarConnected(userId: string): Promise<boolean> {
+  const status = await getCalendarStatus(userId, "google");
+  return status?.connected || false;
+}
+
+// =====================================================
 // DISCONNECT
 // =====================================================
 
 export async function disconnectCalendar(
   userId: string,
-  provider: string
+  provider: string = "google"
 ): Promise<void> {
   await supabase
     .from("user_calendar_integrations")
@@ -495,13 +694,26 @@ export async function disconnectCalendar(
 // EXPORTS
 // =====================================================
 
-export const calendarService = {
-  connectGoogle: connectGoogleCalendar,
-  syncGoogle: syncGoogleCalendar,
+export const CalendarService = {
+  // Connection
+  connectGoogleCalendar,
+  disconnectCalendar,
+  getCalendarStatus,
+  isCalendarConnected,
+
+  // Sync
+  syncGoogleCalendar,
+
+  // Events
   createEvent: createQuestCalendarEvent,
+  createEventFromAI: createCalendarEventFromAI,
+  getDaySchedule,
+
+  // Free time
   findFreeTime: findFreeTimeSlots,
   suggestTime: suggestQuestTime,
-  disconnect: disconnectCalendar,
 };
 
-export default calendarService;
+export const calendarService = CalendarService;
+
+export default CalendarService;
