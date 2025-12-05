@@ -1,3 +1,9 @@
+-- Migration 023: Generate Daily Agenda Function
+-- Creates a function to generate the daily agenda based on user's habits, events, and quests
+
+-- Drop existing function if exists
+DROP FUNCTION IF EXISTS generate_daily_agenda(UUID, DATE);
+
 -- Function to generate the daily agenda based on date and user preferences
 CREATE OR REPLACE FUNCTION generate_daily_agenda(p_user_id UUID, p_date DATE)
 RETURNS TABLE (
@@ -14,7 +20,11 @@ RETURNS TABLE (
   duration_minutes INTEGER,
   priority INTEGER,
   reference_id UUID
-) AS $$
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
   v_day_of_week INTEGER; -- 0 = Sunday, 1 = Monday, ...
   v_day_name TEXT;
@@ -60,7 +70,7 @@ BEGIN
   AND (
     h.frequency = 'daily' 
     OR (h.frequency = 'specific_days' AND v_day_name = ANY(h.frequency_days))
-    OR (h.frequency = 'weekly') -- For now, show weekly habits every day until done? Or let user choose. Assuming daily for now if not specific.
+    OR (h.frequency = 'weekly')
   )
   
   UNION ALL
@@ -77,7 +87,7 @@ BEGIN
     e.color,
     NULL as pillar_id,
     'pending'::TEXT as status,
-    EXTRACT(EPOCH FROM (e.end_time - e.start_time))/60 as duration_minutes,
+    EXTRACT(EPOCH FROM (e.end_time - e.start_time))::INTEGER / 60 as duration_minutes,
     5 as priority,
     e.id as reference_id
   FROM public.calendar_events e
@@ -95,7 +105,7 @@ BEGIN
     c.title,
     c.description,
     c.icon,
-    COALESCE(p.color, '#F59E0B') as color,
+    COALESCE(pl.color, '#F59E0B') as color,
     c.pillar_id,
     CASE WHEN udq.completed THEN 'completed'::TEXT ELSE 'pending'::TEXT END as status,
     COALESCE(c.duration_minutes, 15) as duration_minutes,
@@ -103,9 +113,12 @@ BEGIN
     c.id as reference_id
   FROM public.user_daily_quests udq
   JOIN public.challenges c ON udq.daily_quest_id = c.id
-  LEFT JOIN public.pillars p ON c.pillar_id = p.id
+  LEFT JOIN public.pillars pl ON c.pillar_id = pl.id
   WHERE udq.user_id = p_user_id
   AND udq.assigned_date = p_date;
 
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION generate_daily_agenda(UUID, DATE) TO authenticated;

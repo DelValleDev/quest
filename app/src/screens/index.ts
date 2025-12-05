@@ -1,4 +1,5 @@
 export { WelcomeScreen } from "./onboarding/WelcomeScreen";
+export { LanguageSelectionScreen } from "./onboarding/LanguageSelectionScreen";
 export { AuthScreen } from "./auth/AuthScreen";
 export { HomeScreen } from "./main/HomeScreen";
 export { HabitsScreen } from "./main/HabitsScreen";

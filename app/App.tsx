@@ -4,11 +4,14 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore, useAuthStore } from './src/store';
 import { supabase } from './src/lib/supabase';
 import { NotificationService } from './src/lib/notifications';
+import { setLanguage } from './src/lib/i18n';
 import { 
-  WelcomeScreen, 
+  WelcomeScreen,
+  LanguageSelectionScreen, 
   AuthScreen, 
   QuestCoachScreen,
   AssessmentScreen,
@@ -38,6 +41,7 @@ import { MainTabs } from './src/navigation';
 import * as Linking from 'expo-linking';
 
 export type RootStackParamList = {
+  LanguageSelection: undefined;
   Welcome: undefined;
   Auth: undefined;
   Main: undefined;
@@ -85,9 +89,30 @@ export default function App() {
   const responseListener = useRef<Notifications.EventSubscription>();
   const { mode } = useThemeStore();
   const { session, setSession, isLoading, setIsLoading, isOnboarded, setIsOnboarded } = useAuthStore();
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showLanguageSelection, setShowLanguageSelection] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
   const [needsInitialSetup, setNeedsInitialSetup] = useState(false);
+  const [checkingLanguage, setCheckingLanguage] = useState(true);
+
+  // Check if language was already selected
+  useEffect(() => {
+    const checkLanguage = async () => {
+      try {
+        const savedLanguage = await AsyncStorage.getItem('user_language');
+        if (savedLanguage) {
+          setLanguage(savedLanguage as 'en' | 'es');
+          setShowLanguageSelection(false);
+          setShowWelcome(true);
+        }
+      } catch (e) {
+        console.warn('Error checking language:', e);
+      } finally {
+        setCheckingLanguage(false);
+      }
+    };
+    checkLanguage();
+  }, []);
 
   // Check if user has completed onboarding (assessment)
   const checkOnboardingStatus = async (userId: string) => {
@@ -239,6 +264,11 @@ export default function App() {
   }, [session?.user?.id]);
 
 
+  const handleLanguageSelected = () => {
+    setShowLanguageSelection(false);
+    setShowWelcome(true);
+  };
+
   const handleGetStarted = () => {
     setShowWelcome(false);
   };
@@ -260,7 +290,7 @@ export default function App() {
   };
 
   // Loading state
-  if (isLoading || checkingOnboarding) {
+  if (isLoading || checkingOnboarding || checkingLanguage) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }}>
         <ActivityIndicator size="large" color="#8B5CF6" />
@@ -272,12 +302,18 @@ export default function App() {
     <NavigationContainer>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {/* Not logged in */}
-        {showWelcome && !session ? (
+        {/* Step 1: Language selection (first time only) */}
+        {showLanguageSelection && !session ? (
+          <Stack.Screen name="LanguageSelection">
+            {() => <LanguageSelectionScreen onLanguageSelected={handleLanguageSelected} />}
+          </Stack.Screen>
+        ) : showWelcome && !session ? (
+          /* Step 2: Welcome slider explaining the app */
           <Stack.Screen name="Welcome">
             {() => <WelcomeScreen onGetStarted={handleGetStarted} />}
           </Stack.Screen>
         ) : !session ? (
+          /* Step 3: Auth (login/signup) */
           <Stack.Screen name="Auth">
             {() => <AuthScreen onAuthSuccess={handleAuthSuccess} />}
           </Stack.Screen>

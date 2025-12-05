@@ -1,3 +1,4 @@
+/// <reference path="../deno.d.ts" />
 /**
  * RevenueCat Webhook Handler
  *
