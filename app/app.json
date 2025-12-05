@@ -47,7 +47,9 @@
         {
           "isClinicalDataEnabled": false
         }
-      ]
+      ],
+      "expo-localization",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

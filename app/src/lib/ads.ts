@@ -2,10 +2,12 @@
  * Ads Service - Voluntary Ads System
  * NO intrusive ads, only voluntary rewards
  *
- * Uses: expo-ads-admob (or Google AdMob React Native)
+ * NOTE: expo-ads-admob is deprecated and incompatible with SDK 54.
+ * For now, we use mock ads. When ready for production, migrate to:
+ * - react-native-google-mobile-ads (recommended)
+ * - expo-dev-client with custom native code
  *
  * DEV MODE: Uses mock ads for testing without real AdMob setup
- * Set USE_MOCK_ADS = true for development/testing
  */
 
 import { Platform } from "react-native";
@@ -15,8 +17,8 @@ import { supabase } from "./supabase";
 // CONFIGURATION
 // ============================================
 
-// Enable mock ads for development (no real AdMob needed)
-const USE_MOCK_ADS = __DEV__ || true; // Set to false when ready for production
+// Always use mock ads until we migrate to react-native-google-mobile-ads
+const USE_MOCK_ADS = true;
 
 // Mock ad delay to simulate real ad viewing (ms)
 const MOCK_AD_DURATION = 2000; // 2 seconds
@@ -65,35 +67,16 @@ export interface AdRewardStatus {
   nextAvailable?: Date;
 }
 
-// Dynamic import for AdMob to avoid crashes if not installed
+// AdMob is disabled - using mock ads only
+// To enable real ads, migrate to react-native-google-mobile-ads
 let AdMobRewarded: any = null;
 let isAdMobInitialized = false;
 
 async function initializeAdMob(): Promise<boolean> {
-  if (isAdMobInitialized) return true;
-
-  try {
-    // Try to import expo-ads-admob dynamically
-    // @ts-ignore - Dynamic import for optional dependencies
-    const admob = await import("expo-ads-admob").catch(() => null);
-
-    if (!admob) {
-      console.warn("⚠️ expo-ads-admob not installed, ads disabled");
-      return false;
-    }
-
-    AdMobRewarded = admob.AdMobRewarded;
-
-    // Initialize AdMob
-    await admob.setTestDeviceIDAsync("EMULATOR");
-
-    isAdMobInitialized = true;
-    console.log("✅ AdMob initialized");
-    return true;
-  } catch (error) {
-    console.warn("⚠️ expo-ads-admob not installed, ads disabled");
-    return false;
-  }
+  // AdMob disabled - expo-ads-admob is incompatible with SDK 54
+  // When ready, migrate to react-native-google-mobile-ads
+  console.log("📺 Using mock ads (AdMob disabled)");
+  return false;
 }
 
 /**
