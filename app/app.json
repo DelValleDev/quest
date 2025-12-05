@@ -1,34 +1,58 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "Quest",
+    "slug": "quest-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "owner": "no_neuronas",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0F172A"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.noneuronas.quest",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Quest necesita acceso a tus datos de salud para verificar tus objetivos de ejercicio, pasos y sueño.",
+        "NSHealthUpdateUsageDescription": "Quest puede registrar tus logros de actividad física en Apple Health."
+      }
     },
     "android": {
+      "package": "com.noneuronas.quest",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0F172A"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BODY_SENSORS"
+      ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "scheme": "quest",
     "plugins": [
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      "expo-apple-authentication",
+      [
+        "react-native-health",
+        {
+          "isClinicalDataEnabled": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e6e02aa9-4086-48e7-a286-bf5500c6e821"
+      }
+    }
   }
 }
