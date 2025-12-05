@@ -11,9 +11,12 @@ import {
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeStore, useAuthStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import type { RootStackParamList } from '../../../App';
 
 interface ShopItem {
   id: string;
@@ -58,6 +61,7 @@ export const ShopScreen: React.FC = () => {
   const { mode } = useThemeStore();
   const { user } = useAuthStore();
   const theme = getTheme(mode);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [items, setItems] = useState<ShopItem[]>([]);
   const [inventory, setInventory] = useState<UserInventory[]>([]);
@@ -379,10 +383,14 @@ export const ShopScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>🛒 Shop</Text>
-        <View style={[styles.coinDisplay, { backgroundColor: theme.surface }]}>
+        <TouchableOpacity 
+          style={[styles.coinDisplay, { backgroundColor: theme.surface }]}
+          onPress={() => navigation.navigate('BuyCoins')}
+        >
           <Text style={styles.coinIcon}>🪙</Text>
           <Text style={[styles.coinAmount, { color: theme.warning }]}>{userCoins}</Text>
-        </View>
+          <Text style={[styles.buyCoinsButton, { color: theme.primary }]}>+</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Categories */}
@@ -478,6 +486,11 @@ const styles = StyleSheet.create({
   coinAmount: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buyCoinsButton: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
   categoriesContainer: {
     maxHeight: 60,

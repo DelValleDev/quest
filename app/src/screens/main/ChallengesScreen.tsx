@@ -52,7 +52,11 @@ const DIFFICULTY_XP: Record<string, { label: string; color: string }> = {
   epic: { label: 'Epic', color: '#8B5CF6' },
 };
 
-export const ChallengesScreen: React.FC = () => {
+interface ChallengesScreenProps {
+  embedded?: boolean;
+}
+
+export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = false }) => {
   const { mode } = useThemeStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -205,16 +209,19 @@ export const ChallengesScreen: React.FC = () => {
   ];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Header */}
+    <View style={[styles.container, { backgroundColor: embedded ? 'transparent' : theme.background }]}>
+      {/* Header - hide when embedded */}
+      {!embedded && (
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Quests</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           {activeTab === 'available' ? 'Choose your quest' : `${activeChallenges.length} active quests`}
         </Text>
       </View>
+      )}
 
-      {/* Duels Banner */}
+      {/* Duels Banner - hide when embedded */}
+      {!embedded && (
       <TouchableOpacity
         style={[styles.duelsBanner, { backgroundColor: theme.surface, borderColor: '#F59E0B' }]}
         onPress={() => navigation.navigate('Duels')}
@@ -230,6 +237,7 @@ export const ChallengesScreen: React.FC = () => {
         </View>
         <Text style={[styles.duelsArrow, { color: theme.textSecondary }]}>›</Text>
       </TouchableOpacity>
+      )}
 
       {/* Tab Switcher */}
       <View style={styles.tabContainer}>

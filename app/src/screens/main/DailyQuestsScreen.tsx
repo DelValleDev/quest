@@ -15,6 +15,7 @@ import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 import questAI from '../../lib/openai';
+import { QuestDetailModal } from '../../components/QuestDetailModal';
 
 const { width } = Dimensions.get('window');
 
@@ -51,7 +52,11 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   epic: '#8B5CF6',
 };
 
-export const DailyQuestsScreen: React.FC = () => {
+interface DailyQuestsProps {
+  embedded?: boolean;
+}
+
+export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false }) => {
   const { mode } = useThemeStore();
   const theme = getTheme(mode);
 
@@ -62,6 +67,8 @@ export const DailyQuestsScreen: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [showMoodPicker, setShowMoodPicker] = useState(false);
   const [userMood, setUserMood] = useState<string | null>(null);
+  const [selectedQuest, setSelectedQuest] = useState<any>(null);
+  const [showQuestDetail, setShowQuestDetail] = useState(false);
 
   // Generate quests with AI based on user profile
   const generateAIQuests = async (mood?: string) => {
@@ -341,19 +348,21 @@ export const DailyQuestsScreen: React.FC = () => {
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      contentContainerStyle={styles.content}
+      style={[styles.container, { backgroundColor: embedded ? 'transparent' : theme.background }]}
+      contentContainerStyle={[styles.content, embedded && { paddingTop: 0 }]}
       refreshControl={
         <RefreshControl refreshing={loading} onRefresh={fetchDailyQuests} />
       }
     >
-      {/* Header */}
+      {/* Header - hide when embedded */}
+      {!embedded && (
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Daily Quests</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </Text>
       </View>
+      )}
 
       {/* Progress Card */}
       <View style={[styles.progressCard, { backgroundColor: theme.surface }]}>
@@ -489,8 +498,22 @@ export const DailyQuestsScreen: React.FC = () => {
                 { backgroundColor: theme.surface },
                 quest.completed && styles.questCompleted,
               ]}
-              onPress={() => completeQuest(quest)}
-              disabled={quest.completed}
+              onPress={() => {
+                // Open detail modal instead of completing directly
+                setSelectedQuest({
+                  id: quest.id,
+                  title: quest.challenge.title,
+                  description: quest.challenge.description,
+                  pillar_id: quest.challenge.pillar_id,
+                  difficulty: quest.challenge.difficulty,
+                  xp_reward: quest.challenge.xp_reward,
+                  coin_reward: quest.challenge.coin_reward,
+                  duration_minutes: quest.challenge.duration_minutes,
+                  icon: quest.challenge.icon,
+                  status: quest.completed ? 'completed' : 'pending',
+                });
+                setShowQuestDetail(true);
+              }}
             >
               <View
                 style={[
@@ -577,6 +600,35 @@ export const DailyQuestsScreen: React.FC = () => {
           </View>
         )}
       </View>
+
+      {/* Quest Detail Modal */}
+      <QuestDetailModal
+        visible={showQuestDetail}
+        quest={selectedQuest}
+        onClose={() => {
+          setShowQuestDetail(false);
+          setSelectedQuest(null);
+        }}
+        onStatusChange={async (questId, newStatus) => {
+          // Find the original quest
+          const quest = dailyQuests.find(q => q.id === questId);
+          if (!quest) return;
+          
+          if (newStatus === 'completed') {
+            await completeQuest(quest);
+          } else if (newStatus === 'active') {
+            // TODO: Mark as active (in progress)
+            // For now just update UI
+            setSelectedQuest((prev: any) => prev ? { ...prev, status: 'active', started_at: new Date().toISOString() } : null);
+          } else if (newStatus === 'pending') {
+            setSelectedQuest((prev: any) => prev ? { ...prev, status: 'pending' } : null);
+          } else if (newStatus === 'skipped') {
+            // TODO: Implement skip logic
+            setShowQuestDetail(false);
+            fetchDailyQuests();
+          }
+        }}
+      />
     </ScrollView>
   );
 };

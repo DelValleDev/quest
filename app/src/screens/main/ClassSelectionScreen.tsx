@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useAuthStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import type { RootStackParamList } from '../../../App';
@@ -86,6 +86,7 @@ const PILLAR_NAMES: Record<string, string> = {
 // =====================================================
 export const ClassSelectionScreen: React.FC = () => {
   const { mode } = useThemeStore();
+  const { setIsOnboarded } = useAuthStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute();
@@ -189,7 +190,8 @@ export const ClassSelectionScreen: React.FC = () => {
                     text: "Let's Go!",
                     onPress: () => {
                       if (isOnboarding) {
-                        navigation.navigate('Main');
+                        // Set onboarded to true - this will re-render App and show Main
+                        setIsOnboarded(true);
                       } else {
                         navigation.goBack();
                       }

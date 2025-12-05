@@ -46,7 +46,11 @@ const RANK_COLORS: Record<number, string> = {
   3: '#CD7F32', // Bronze
 };
 
-export const LeaderboardScreen: React.FC = () => {
+interface LeaderboardScreenProps {
+  embedded?: boolean;
+}
+
+export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ embedded = false }) => {
   const { mode } = useThemeStore();
   const isDark = mode === 'dark';
 
@@ -354,21 +358,23 @@ export const LeaderboardScreen: React.FC = () => {
     );
   };
 
+  const Container = embedded ? View : SafeAreaView;
+
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <Container style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Cargando ranking...
           </Text>
         </View>
-      </SafeAreaView>
+      </Container>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <Container style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>🏆 Ranking</Text>
@@ -398,7 +404,7 @@ export const LeaderboardScreen: React.FC = () => {
 
         <View style={{ height: 100 }} />
       </ScrollView>
-    </SafeAreaView>
+    </Container>
   );
 };
 

@@ -7,12 +7,15 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Switch,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeStore, useAuthStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import { PremiumService } from '../../lib/premium';
+import notifications from '../../lib/notifications';
 import type { RootStackParamList } from '../../../App';
 
 interface Profile {
@@ -60,6 +63,9 @@ export const ProfileScreen: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pillars, setPillars] = useState<UserPillar[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [isPremium, setIsPremium] = useState(false);
+  const [trialDays, setTrialDays] = useState(0);
 
   const fetchProfile = async () => {
     try {
@@ -104,6 +110,15 @@ export const ProfileScreen: React.FC = () => {
 
       if (pillarsError) throw pillarsError;
       setPillars(pillarsData || []);
+      
+      // Check premium status
+      const premiumStatus = await PremiumService.isPremium(user.id);
+      setIsPremium(premiumStatus);
+      
+      if (premiumStatus) {
+        const trialRemaining = await PremiumService.getTrialDaysRemaining(user.id);
+        setTrialDays(trialRemaining || 0);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
@@ -268,6 +283,92 @@ export const ProfileScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
 
+        {/* Premium Subscription */}
+        <TouchableOpacity
+          style={[styles.premiumRow, { 
+            backgroundColor: isPremium ? '#F59E0B15' : theme.primary + '15',
+            borderColor: isPremium ? '#F59E0B' : theme.primary,
+          }]}
+          onPress={() => navigation.navigate('Premium')}
+        >
+          <View style={styles.premiumLeft}>
+            <Text style={styles.premiumIcon}>👑</Text>
+            <View>
+              <Text style={[styles.premiumTitle, { color: isPremium ? '#F59E0B' : theme.primary }]}>
+                {isPremium ? 'Quest Premium' : 'Upgrade to Premium'}
+              </Text>
+              <Text style={[styles.premiumSubtitle, { color: theme.textSecondary }]}>
+                {isPremium 
+                  ? trialDays > 0 
+                    ? `${trialDays} days trial remaining`
+                    : 'All features unlocked'
+                  : 'Unlock all features'}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.settingAction, { color: isPremium ? '#F59E0B' : theme.primary }]}>
+            {isPremium ? 'View' : 'Upgrade'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* My Plan - Quick access to subscription status */}
+        <TouchableOpacity
+          style={styles.settingRow}
+          onPress={() => navigation.navigate('MyPlan')}
+        >
+          <Text style={styles.settingIcon}>📋</Text>
+          <Text style={[styles.settingText, { color: theme.text }]}>
+            Mi Plan
+          </Text>
+          <Text style={[styles.settingAction, { color: theme.primary }]}>
+            Ver
+          </Text>
+        </TouchableOpacity>
+
+        {/* Google Calendar Integration */}
+        <TouchableOpacity
+          style={[styles.googleBtn, { borderColor: theme.border, backgroundColor: theme.background }]}
+          onPress={() => Alert.alert('Coming Soon', 'Google Calendar integration will be available in the next update!')}
+        >
+          <Image 
+            source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Google_Calendar_icon_%282020%29.svg/1024px-Google_Calendar_icon_%282020%29.svg.png' }} 
+            style={{ width: 24, height: 24 }} 
+          />
+          <Text style={[styles.googleBtnText, { color: theme.text }]}>
+            Connect Google Calendar
+          </Text>
+        </TouchableOpacity>
+
+        {/* Notifications */}
+        <View style={styles.settingRow}>
+          <Text style={styles.settingIcon}>🔔</Text>
+          <Text style={[styles.settingText, { color: theme.text, flex: 1 }]}>
+            Push Notifications
+          </Text>
+          <Switch
+            value={notificationsEnabled}
+            onValueChange={async (value) => {
+              setNotificationsEnabled(value);
+              if (value) {
+                const token = await notifications.registerForPushNotifications();
+                if (token && profile?.id) {
+                  await notifications.savePushToken(profile.id, token);
+                  await notifications.scheduleDailyQuestReminder();
+                  await notifications.scheduleStreakWarning();
+                  await notifications.scheduleDailyMotivation();
+                  Alert.alert('✅ Notifications Enabled', 'You will receive daily reminders and motivation!');
+                }
+              } else {
+                await notifications.cancelAllNotifications();
+                await supabase.from('profiles').update({ push_enabled: false }).eq('id', profile?.id);
+                Alert.alert('Notifications Disabled', 'You will not receive push notifications.');
+              }
+            }}
+            trackColor={{ false: theme.border, true: theme.primary }}
+            thumbColor="#FFF"
+          />
+        </View>
+
         <TouchableOpacity
           style={styles.settingRow}
           onPress={handleSignOut}
@@ -399,6 +500,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 16,
   },
+  // ... existing styles ...
   pillarsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -446,6 +548,46 @@ const styles = StyleSheet.create({
   settingAction: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 16,
+    borderWidth: 1,
+  },
+  googleBtnText: {
+    marginLeft: 8,
+    fontWeight: '600',
+  },
+  premiumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  premiumLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  premiumIcon: {
+    fontSize: 28,
+    marginRight: 12,
+  },
+  premiumTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  premiumSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
   },
   footer: {
     textAlign: 'center',

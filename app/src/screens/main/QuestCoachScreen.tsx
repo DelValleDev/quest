@@ -12,10 +12,15 @@ import {
   Dimensions,
   Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import questAI from '../../lib/openai';
+import { SimpleMarkdown, PaywallModal } from '../../components';
+import { PremiumService } from '../../lib/premium';
+import type { RootStackParamList } from '../../../App';
 
 const { width } = Dimensions.get('window');
 
@@ -119,21 +124,31 @@ const COACH_RESPONSES = {
 };
 
 const QUICK_REPLIES = [
-  "¿Cómo puedo mejorar?",
-  "Dame motivación",
-  "¿Qué son los pilares?",
-  "Consejo del día",
+  "¿Cuáles son mis Life Paths?",
+  "Muéstrame mis hábitos",
+  "Crea un nuevo quest",
+  "¿Qué debo hacer hoy?",
+  "Analiza mi progreso",
 ];
 
 export const QuestCoachScreen: React.FC = () => {
   const { mode } = useThemeStore();
   const theme = getTheme(mode);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const scrollViewRef = useRef<ScrollView>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [userContext, setUserContext] = useState<UserContext | null>(null);
   const [mascotBounce] = useState(new Animated.Value(0));
+  const [showConversationList, setShowConversationList] = useState(false);
+  const [conversations, setConversations] = useState<any[]>([]);
+  
+  // Premium state
+  const [isPremium, setIsPremium] = useState(true); // Default true to not block initially
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [dailyMessagesUsed, setDailyMessagesUsed] = useState(0);
+  const FREE_DAILY_LIMIT = 5; // Free users get 5 messages per day
 
   // Mascot thinking animation
   const startTypingAnimation = () => {
@@ -158,12 +173,17 @@ export const QuestCoachScreen: React.FC = () => {
     mascotBounce.setValue(0);
   };
 
-  // Fetch user context
+  // Fetch user context and chat history
   useEffect(() => {
-    const fetchUserContext = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Check premium status
+      const premiumStatus = await PremiumService.isPremium(user.id);
+      setIsPremium(premiumStatus);
+
+      // 1. Fetch Profile
       const { data: profile } = await supabase
         .from('profiles')
         .select('display_name, level, current_streak, pillar_scores, assessment_completed')
@@ -183,7 +203,7 @@ export const QuestCoachScreen: React.FC = () => {
           }
         }
 
-        setUserContext({
+        const context = {
           displayName: profile.display_name || 'Adventurer',
           level: profile.level || 1,
           currentStreak: profile.current_streak || 0,
@@ -191,43 +211,100 @@ export const QuestCoachScreen: React.FC = () => {
           assessmentCompleted: profile.assessment_completed || false,
           weakestPillar: weakest,
           strongestPillar: strongest,
-        });
+        };
+        setUserContext(context);
+
+        // 2. Fetch Chat History (TODAY'S CONVERSATION)
+        const today = new Date().toISOString().split('T')[0];
+        const { data: history } = await supabase
+          .from('chat_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .gte('created_at', today + 'T00:00:00')
+          .order('created_at', { ascending: true });
+
+        if (history && history.length > 0) {
+          setMessages(history.map(h => ({
+            id: h.id,
+            text: h.message,
+            isUser: h.is_user,
+            timestamp: new Date(h.created_at),
+          })));
+          
+          // Count user messages for daily limit
+          const userMessages = history.filter(h => h.is_user).length;
+          setDailyMessagesUsed(userMessages);
+          
+          setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 500);
+        } else {
+          // Only send greeting if no history
+          sendInitialGreeting(context);
+        }
       }
     };
 
-    fetchUserContext();
+    init();
   }, []);
 
-  // Send initial greeting when context is loaded
-  useEffect(() => {
-    if (userContext && messages.length === 0) {
-      const greeting = getRandomItem(COACH_RESPONSES.greeting)
-        .replace('{name}', userContext.displayName);
-      
-      addBotMessage(greeting);
+  // Fetch past conversations (grouped by day)
+  const loadConversations = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      // Add context-aware follow-up
-      setTimeout(() => {
-        if (userContext.currentStreak >= 3) {
-          const streakMsg = getRandomItem(COACH_RESPONSES.streakCelebration)
-            .replace('{name}', userContext.displayName)
-            .replace('{streak}', String(userContext.currentStreak));
-          addBotMessage(streakMsg);
-        } else if (!userContext.assessmentCompleted) {
-          addBotMessage("🎯 Te recomiendo completar el Assessment inicial para personalizar tu experiencia.");
-        } else if (userContext.weakestPillar) {
-          const pillar = PILLARS.find(p => p.id === userContext.weakestPillar);
-          addBotMessage(`📊 Veo que ${pillar?.name || userContext.weakestPillar} podría usar algo de atención. ¿Quieres algunos consejos?`);
-        }
-      }, 1500);
+    const { data: history } = await supabase
+      .from('chat_history')
+      .select('created_at, message, is_user')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (history) {
+      // Group by day
+      const grouped: Record<string, any[]> = {};
+      history.forEach(h => {
+        const day = new Date(h.created_at).toISOString().split('T')[0];
+        if (!grouped[day]) grouped[day] = [];
+        grouped[day].push(h);
+      });
+
+      const conversationList = Object.entries(grouped).map(([day, msgs]) => ({
+        day,
+        messageCount: msgs.length,
+        lastMessage: msgs[0].message.substring(0, 50) + '...',
+        messages: msgs,
+      }));
+
+      setConversations(conversationList);
     }
-  }, [userContext]);
+  };
+
+  const sendInitialGreeting = (context: UserContext) => {
+    const greeting = getRandomItem(COACH_RESPONSES.greeting)
+      .replace('{name}', context.displayName);
+    
+    addBotMessage(greeting);
+
+    // Add context-aware follow-up
+    setTimeout(() => {
+      if (context.currentStreak >= 3) {
+        const streakMsg = getRandomItem(COACH_RESPONSES.streakCelebration)
+          .replace('{name}', context.displayName)
+          .replace('{streak}', String(context.currentStreak));
+        addBotMessage(streakMsg);
+      } else if (!context.assessmentCompleted) {
+        addBotMessage("🎯 Te recomiendo completar el Assessment inicial para personalizar tu experiencia.");
+      } else if (context.weakestPillar) {
+        const pillar = PILLARS.find(p => p.id === context.weakestPillar);
+        addBotMessage(`📊 Veo que ${pillar?.name || context.weakestPillar} podría usar algo de atención. ¿Quieres algunos consejos?`);
+      }
+    }, 1500);
+  };
 
   const getRandomItem = <T,>(arr: T[]): T => {
     return arr[Math.floor(Math.random() * arr.length)];
   };
 
-  const addBotMessage = (text: string) => {
+  const addBotMessage = async (text: string) => {
     const newMessage: Message = {
       id: Date.now().toString(),
       text,
@@ -236,6 +313,20 @@ export const QuestCoachScreen: React.FC = () => {
     };
     setMessages(prev => [...prev, newMessage]);
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+
+    // Persist to DB
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('chat_history').insert({
+          user_id: user.id,
+          message: text,
+          is_user: false
+        });
+      }
+    } catch (error) {
+      console.error('Error saving bot message:', error);
+    }
   };
 
   const generateResponse = (userMessage: string): string => {
@@ -294,29 +385,47 @@ export const QuestCoachScreen: React.FC = () => {
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
+    // Check if free user has exceeded daily limit
+    if (!isPremium && dailyMessagesUsed >= FREE_DAILY_LIMIT) {
+      setShowPaywall(true);
+      return;
+    }
+
+    const messageText = inputText.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText.trim(),
+      text: messageText,
       isUser: true,
       timestamp: new Date(),
     };
 
     setMessages(prev => [...prev, userMessage]);
-    const messageText = inputText.trim();
     setInputText('');
     setIsTyping(true);
     startTypingAnimation();
+    
+    // Increment daily message count for free users
+    if (!isPremium) {
+      setDailyMessagesUsed(prev => prev + 1);
+    }
 
     try {
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user');
+
+      // Save user message to DB
+      await supabase.from('chat_history').insert({
+        user_id: user.id,
+        message: messageText,
+        is_user: true
+      });
+
       // Build conversation history for AI
       const conversationHistory = messages.map(m => ({
         role: m.isUser ? 'user' as const : 'assistant' as const,
         content: m.text,
       }));
-
-      // Get user ID
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user');
 
       // Call real AI with proper signature
       const response = await questAI.chat(user.id, messageText, conversationHistory);
@@ -361,7 +470,19 @@ export const QuestCoachScreen: React.FC = () => {
           <Text style={[styles.headerStatus, { color: isTyping ? theme.primary : theme.success }]}>
             {isTyping ? 'Pensando...' : 'En línea'}
           </Text>
+          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+            Tu coach personal con acceso total a tus datos
+          </Text>
         </View>
+        <TouchableOpacity 
+          style={[styles.historyButton, { backgroundColor: theme.primary + '20' }]}
+          onPress={() => {
+            loadConversations();
+            setShowConversationList(true);
+          }}
+        >
+          <Text style={{ fontSize: 20 }}>📚</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Messages */}
@@ -384,14 +505,14 @@ export const QuestCoachScreen: React.FC = () => {
           >
             {!message.isUser && <Text style={styles.botAvatar}>🤖</Text>}
             <View style={styles.messageContent}>
-              <Text
-                style={[
+              <SimpleMarkdown
+                text={message.text}
+                baseStyle={[
                   styles.messageText,
                   { color: message.isUser ? '#FFFFFF' : theme.text },
                 ]}
-              >
-                {message.text}
-              </Text>
+                boldStyle={{ fontWeight: 'bold' }}
+              />
               <Text
                 style={[
                   styles.messageTime,
@@ -454,6 +575,79 @@ export const QuestCoachScreen: React.FC = () => {
           <Text style={styles.sendButtonText}>➤</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Past Conversations Modal */}
+      <Modal
+        visible={showConversationList}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowConversationList(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Conversaciones Pasadas 📚</Text>
+              <TouchableOpacity onPress={() => setShowConversationList(false)}>
+                <Text style={{ fontSize: 24, color: theme.text }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.conversationList}>
+              {conversations.map((conv) => (
+                <TouchableOpacity
+                  key={conv.day}
+                  style={[styles.conversationItem, { backgroundColor: theme.background }]}
+                  onPress={() => {
+                    setMessages(conv.messages.reverse().map((m: any) => ({
+                      id: Math.random().toString(),
+                      text: m.message,
+                      isUser: m.is_user,
+                      timestamp: new Date(m.created_at),
+                    })));
+                    setShowConversationList(false);
+                    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 500);
+                  }}
+                >
+                  <Text style={[styles.conversationDate, { color: theme.text }]}>
+                    {new Date(conv.day).toLocaleDateString('es-ES', { 
+                      weekday: 'long', 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
+                  </Text>
+                  <Text style={[styles.conversationPreview, { color: theme.textSecondary }]}>
+                    {conv.messageCount} mensajes - {conv.lastMessage}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              
+              {conversations.length === 0 && (
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  No hay conversaciones pasadas
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Paywall Modal for Free Users */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        featureId="AI_COACH"
+        customMessage={`Has usado ${dailyMessagesUsed}/${FREE_DAILY_LIMIT} mensajes gratis hoy. ¡Hazte Premium para chatear sin límites!`}
+      />
+
+      {/* Free User Limit Warning */}
+      {!isPremium && (
+        <View style={[styles.limitBanner, { backgroundColor: theme.primary + '15' }]}>
+          <Text style={[styles.limitText, { color: theme.primary }]}>
+            💬 {FREE_DAILY_LIMIT - dailyMessagesUsed} mensajes gratis restantes hoy
+          </Text>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -485,6 +679,18 @@ const styles = StyleSheet.create({
   headerStatus: {
     fontSize: 12,
     marginTop: 2,
+  },
+  headerSubtitle: {
+    fontSize: 10,
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  historyButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   messagesContainer: {
     flex: 1,
@@ -595,6 +801,66 @@ const styles = StyleSheet.create({
   sendButtonText: {
     fontSize: 20,
     color: '#FFFFFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    height: '70%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  conversationList: {
+    flex: 1,
+    padding: 16,
+  },
+  conversationItem: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  conversationDate: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  conversationPreview: {
+    fontSize: 12,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 40,
+    fontSize: 14,
+  },
+  limitBanner: {
+    position: 'absolute',
+    top: 120,
+    left: 16,
+    right: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  limitText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
 

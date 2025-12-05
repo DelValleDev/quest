@@ -17,6 +17,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useThemeStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
+import { PaywallModal } from '../../components';
+import { PremiumService } from '../../lib/premium';
 import type { RootStackParamList } from '../../../App';
 
 // =====================================================
@@ -130,6 +132,10 @@ export const RaidsScreen: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<RaidTemplate | null>(null);
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  
+  // Premium state
+  const [isPremium, setIsPremium] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   // =====================================================
   // DATA FETCHING
@@ -137,6 +143,11 @@ export const RaidsScreen: React.FC = () => {
   const fetchData = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      // Check premium status
+      const premiumStatus = await PremiumService.isPremium(user.id);
+      setIsPremium(premiumStatus);
       if (!user) return;
 
       // Fetch my raids
@@ -209,6 +220,14 @@ export const RaidsScreen: React.FC = () => {
   // =====================================================
   // ACTIONS
   // =====================================================
+  const handleCreatePress = () => {
+    if (!isPremium) {
+      setShowPaywall(true);
+      return;
+    }
+    setShowCreateModal(true);
+  };
+
   const createRaid = async () => {
     if (!selectedTemplate) return;
     if (selectedFriends.length < 2) {
@@ -389,9 +408,9 @@ export const RaidsScreen: React.FC = () => {
           </Text>
           <TouchableOpacity
             style={[styles.createButton, { backgroundColor: theme.primary }]}
-            onPress={() => setShowCreateModal(true)}
+            onPress={handleCreatePress}
           >
-            <Text style={styles.createButtonText}>⚔️ Start a Raid</Text>
+            <Text style={styles.createButtonText}>⚔️ Start a Raid {!isPremium && '👑'}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -900,9 +919,9 @@ export const RaidsScreen: React.FC = () => {
         <Text style={[styles.title, { color: theme.text }]}>⚔️ Raids</Text>
         <TouchableOpacity
           style={[styles.newRaidButton, { backgroundColor: theme.primary }]}
-          onPress={() => setShowCreateModal(true)}
+          onPress={handleCreatePress}
         >
-          <Text style={styles.newRaidButtonText}>+ New</Text>
+          <Text style={styles.newRaidButtonText}>+ New {!isPremium && '👑'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -944,6 +963,13 @@ export const RaidsScreen: React.FC = () => {
       {/* Modals */}
       {renderCreateModal()}
       {renderDetailModal()}
+      
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        featureId="RAIDS"
+      />
     </SafeAreaView>
   );
 };

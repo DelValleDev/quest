@@ -14,6 +14,7 @@ import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { PillarProgressChart } from '../../components/PillarProgressChart';
 
 type RootStackParamList = {
   Main: undefined;
@@ -23,6 +24,9 @@ type RootStackParamList = {
   Agenda: undefined;
   Duels: undefined;
   Raids: undefined;
+  Profile: undefined;
+  Achievements: undefined;
+  Settings: undefined;
 };
 
 const { width } = Dimensions.get('window');
@@ -114,6 +118,7 @@ export const HomeScreen: React.FC = () => {
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   
+  const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [pillars, setPillars] = useState<UserPillar[]>([]);
   const [activeChallenges, setActiveChallenges] = useState<ActiveChallenge[]>([]);
@@ -212,6 +217,8 @@ export const HomeScreen: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      
+      setUserId(user.id);
 
       // Fetch profile with assessment fields
       let { data: profileData, error: profileError } = await supabase
@@ -320,9 +327,23 @@ export const HomeScreen: React.FC = () => {
             {profile?.display_name || 'Adventurer'} 👋
           </Text>
         </View>
-        <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-          <Text style={{ fontSize: 24 }}>{mode === 'dark' ? '☀️' : '🌙'}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Achievements')} 
+            style={styles.headerButton}
+          >
+            <Text style={{ fontSize: 22 }}>🏆</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Main', { screen: 'Profile' })} 
+            style={styles.headerButton}
+          >
+            <Text style={{ fontSize: 22 }}>👤</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={toggleTheme} style={styles.headerButton}>
+            <Text style={{ fontSize: 22 }}>{mode === 'dark' ? '☀️' : '🌙'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Quest Mascot Card */}
@@ -484,6 +505,11 @@ export const HomeScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Pillar Progress Chart */}
+      {userId && (
+        <PillarProgressChart userId={userId} theme={theme} />
+      )}
+
       {/* Active Challenges */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -532,6 +558,13 @@ export const HomeScreen: React.FC = () => {
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
         <View style={styles.quickActionsRow}>
+          <TouchableOpacity
+            style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
+            onPress={() => navigation.navigate('LifePaths')}
+          >
+            <Text style={styles.quickActionIcon}>🎯</Text>
+            <Text style={[styles.quickActionLabel, { color: theme.text }]}>Paths</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
             onPress={() => navigation.navigate('Agenda')}
@@ -610,7 +643,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
   },
-  themeToggle: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  headerButton: {
     padding: 8,
   },
   // Quest Mascot Card
