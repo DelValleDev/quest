@@ -50,5 +50,23 @@
     "@types/react": "~19.1.0",
     "typescript": "~5.9.2"
   },
+  "resolutions": {
+    "@expo/fingerprint": "0.15.4"
+  },
+  "overrides": {
+    "@expo/fingerprint": "0.15.4"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-google-fit",
+          "react-native-health",
+          "expo-ads-admob"
+        ],
+        "listUnknownPackages": false
+      }
+    }
+  },
   "private": true
 }
