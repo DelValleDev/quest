@@ -1,4 +1,199 @@
-# 🚀 Quest - Guía de Configuración
+# 🚀 Quest - Setup Guide
+
+This guide will walk you step by step through configuring the Quest project.
+
+---
+
+## 📋 Prerequisites
+
+- Node.js 18+ installed
+- npm or yarn
+- Expo CLI (`npm install -g expo-cli`)
+- [Supabase](https://supabase.com) account
+- [OpenAI](https://platform.openai.com) account (for AI Coach)
+
+---
+
+## 1️⃣ Configure Supabase (Backend)
+
+### Step 1: Create Project
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+2. Click "New Project"
+3. Choose a name and secure password
+4. Wait ~2 minutes for creation
+
+### Step 2: Run Migrations
+Go to **SQL Editor** in your dashboard and run the migration files in order from `supabase/migrations/`:
+
+```
+📁 supabase/migrations/
+├── 001_life_paths_subscription_limits.sql
+├── 002_fix_assessment_questions.sql
+├── ... (continue in numerical order)
+└── 023_generate_daily_agenda.sql
+```
+
+> **Note**: For initial setup, run `database/00_MASTER_SCHEMA.sql` first, then `database/01_ASSESSMENT_QUESTIONS.sql`, and finally apply migrations in order.
+
+⚠️ **Important**: Execute each file separately and verify there are no errors.
+
+### Step 3: Get Credentials
+1. Go to **Settings → API**
+2. Copy:
+   - **Project URL** → `EXPO_PUBLIC_SUPABASE_URL`
+   - **anon public key** → `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+---
+
+## 2️⃣ Configure OpenAI (AI Coach)
+
+### Step 1: Create API Key
+1. Go to [OpenAI API Keys](https://platform.openai.com/api-keys)
+2. Click "Create new secret key"
+3. Copy the key (starts with `sk-proj-...`)
+
+### Step 2: Add Credits
+1. Go to [Billing](https://platform.openai.com/settings/organization/billing)
+2. Add a payment method
+3. The `gpt-4o-mini` model costs approximately:
+   - $0.15 per 1M input tokens
+   - $0.60 per 1M output tokens
+   - For normal use: ~$5-10/month
+
+⚠️ **Without API key**: The AI Coach will work with pre-defined responses (local fallback).
+
+---
+
+## 3️⃣ Configure Health Integrations
+
+### HealthKit (iOS)
+HealthKit is already configured in the project. Permissions are requested at runtime.
+
+### Google Fit (Android)
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create or select a project
+3. Enable **Fitness API**
+4. Create OAuth credentials (Android type)
+5. Add your SHA-1 fingerprint
+6. Add Client ID to `.env`:
+   ```
+   EXPO_PUBLIC_GOOGLE_FIT_CLIENT_ID=your-client-id.apps.googleusercontent.com
+   ```
+
+---
+
+## 4️⃣ Configure Environment Variables
+
+1. In the `app/` folder, copy the example file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit `.env` with your values:
+   ```env
+   # Supabase (REQUIRED)
+   EXPO_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6...
+   
+   # OpenAI (REQUIRED for AI Coach)
+   EXPO_PUBLIC_OPENAI_API_KEY=sk-proj-xxxxx
+   
+   # Google Fit (Android)
+   EXPO_PUBLIC_GOOGLE_FIT_CLIENT_ID=xxxxx.apps.googleusercontent.com
+   
+   # RevenueCat (Optional - for payments)
+   EXPO_PUBLIC_REVENUECAT_API_KEY_IOS=appl_xxxxx
+   EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID=goog_xxxxx
+   ```
+
+---
+
+## 5️⃣ Install and Run
+
+```bash
+# Enter the app folder
+cd app
+
+# Install dependencies
+npm install
+
+# Start Expo
+npx expo start
+```
+
+Options to view the app:
+- **iOS Simulator**: Press `i`
+- **Android Emulator**: Press `a`
+- **Expo Go (your phone)**: Scan the QR code
+
+---
+
+## 🧪 Test Everything Works
+
+### Test 1: Supabase Connection
+1. Open the app
+2. Register a new account
+3. You should be able to create a user without errors
+
+### Test 2: AI Coach
+1. Go to the Quest Coach screen (chat)
+2. Type "Hello"
+3. If OpenAI is configured: Personalized response
+4. If not: Generic response (fallback)
+
+### Test 3: Assessment
+1. Complete the initial questionnaire
+2. Verify in Supabase that `pillar_scores` were saved
+
+---
+
+## ❓ Troubleshooting
+
+### Error: "supabase is not defined"
+→ Verify that `.env` has the correct Supabase variables
+
+### Error: "OpenAI API error"
+→ Verify your API key and that you have credits
+
+### Error: "Policy already exists"
+→ Already fixed in SQL files with `DROP POLICY IF EXISTS`
+
+### App doesn't load
+→ Delete `node_modules` and reinstall:
+```bash
+rm -rf node_modules
+npm install
+```
+
+---
+
+## 📱 For Production
+
+When you're ready to publish:
+
+1. **EAS Build**:
+   ```bash
+   npx eas build --platform all
+   ```
+
+2. **Production variables** in `eas.json`
+
+3. **Production Supabase**: Use a separate project
+
+---
+
+## 📞 Support
+
+Problems? Check:
+- [Supabase Documentation](https://supabase.com/docs)
+- [Expo Documentation](https://docs.expo.dev)
+- [OpenAI API Reference](https://platform.openai.com/docs)
+
+---
+
+---
+
+# 🚀 Quest - Guía de Configuración (Español)
 
 Esta guía te llevará paso a paso para configurar el proyecto Quest.
 
@@ -22,24 +217,18 @@ Esta guía te llevará paso a paso para configurar el proyecto Quest.
 3. Elige un nombre y contraseña segura
 4. Espera ~2 minutos a que se cree
 
-### Paso 2: Ejecutar Scripts SQL
-Ve a **SQL Editor** en tu dashboard y ejecuta los archivos en este orden:
+### Paso 2: Ejecutar Migraciones
+Ve a **SQL Editor** en tu dashboard y ejecuta los archivos de migración en orden desde `supabase/migrations/`:
 
 ```
-📁 database/
-├── 1. schema.sql              (tablas principales)
-├── 2. social.sql              (amigos, solicitudes)
-├── 3. shop.sql                (tienda, inventario)
-├── 4. assessment.sql          (cuestionario inicial)
-├── 5. daily_quests_achievements.sql
-├── 6. daily_quest_system.sql  (quests diarias)
-├── 7. duels_system.sql        (duelos 1v1)
-├── 8. raids_system.sql        (raids grupales)
-├── 9. classes_system.sql      (clases de personaje)
-├── 10. activity_feed.sql      (feed de actividad)
-├── 11. calendar_system.sql    (integración calendario)
-└── 12. schema_updates.sql     (actualizaciones finales)
+📁 supabase/migrations/
+├── 001_life_paths_subscription_limits.sql
+├── 002_fix_assessment_questions.sql
+├── ... (continúa en orden numérico)
+└── 023_generate_daily_agenda.sql
 ```
+
+> **Nota**: Para setup inicial, ejecuta primero `database/00_MASTER_SCHEMA.sql`, luego `database/01_ASSESSMENT_QUESTIONS.sql`, y finalmente aplica las migraciones en orden.
 
 ⚠️ **Importante**: Ejecuta cada archivo por separado y verifica que no haya errores.
 
@@ -70,27 +259,21 @@ Ve a **SQL Editor** en tu dashboard y ejecuta los archivos en este orden:
 
 ---
 
-## 3️⃣ Configurar Google Calendar (Opcional)
+## 3️⃣ Configurar Integraciones de Salud
 
-### Paso 1: Crear Proyecto en Google Cloud
+### HealthKit (iOS)
+HealthKit ya está configurado en el proyecto. Los permisos se solicitan en tiempo de ejecución.
+
+### Google Fit (Android)
 1. Ve a [Google Cloud Console](https://console.cloud.google.com)
-2. Crea un nuevo proyecto o selecciona uno existente
-3. Ve a **APIs & Services → Library**
-4. Busca y habilita **Google Calendar API**
-
-### Paso 2: Crear Credenciales OAuth
-1. Ve a **APIs & Services → Credentials**
-2. Clic en **Create Credentials → OAuth client ID**
-3. Tipo: **Web application**
-4. Authorized redirect URIs: `https://auth.expo.io/@TU_USUARIO/quest`
-5. Copia:
-   - **Client ID** → `EXPO_PUBLIC_GOOGLE_CLIENT_ID`
-   - **Client Secret** → `EXPO_PUBLIC_GOOGLE_CLIENT_SECRET`
-
-### Paso 3: Configurar Consent Screen
-1. Ve a **OAuth consent screen**
-2. Llena la información básica
-3. Agrega scope: `https://www.googleapis.com/auth/calendar.readonly`
+2. Crea o selecciona un proyecto
+3. Habilita **Fitness API**
+4. Crea credenciales OAuth (tipo Android)
+5. Agrega tu fingerprint SHA-1
+6. Agrega el Client ID a `.env`:
+   ```
+   EXPO_PUBLIC_GOOGLE_FIT_CLIENT_ID=tu-client-id.apps.googleusercontent.com
+   ```
 
 ---
 
@@ -110,9 +293,12 @@ Ve a **SQL Editor** en tu dashboard y ejecuta los archivos en este orden:
    # OpenAI (REQUERIDO para AI Coach)
    EXPO_PUBLIC_OPENAI_API_KEY=sk-proj-xxxxx
    
-   # Google Calendar (OPCIONAL)
-   EXPO_PUBLIC_GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
-   EXPO_PUBLIC_GOOGLE_CLIENT_SECRET=GOCSPX-xxxxx
+   # Google Fit (Android)
+   EXPO_PUBLIC_GOOGLE_FIT_CLIENT_ID=xxxxx.apps.googleusercontent.com
+   
+   # RevenueCat (Opcional - para pagos)
+   EXPO_PUBLIC_REVENUECAT_API_KEY_IOS=appl_xxxxx
+   EXPO_PUBLIC_REVENUECAT_API_KEY_ANDROID=goog_xxxxx
    ```
 
 ---
@@ -197,7 +383,3 @@ Cuando estés listo para publicar:
 - [Documentación de Supabase](https://supabase.com/docs)
 - [Documentación de Expo](https://docs.expo.dev)
 - [OpenAI API Reference](https://platform.openai.com/docs)
-
----
-
-**¡Listo! Tu Quest está configurado.** 🎮✨

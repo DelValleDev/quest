@@ -1,74 +1,276 @@
 # 🎮 QUEST
 
-**"Tu vida es la Quest. Tu IA Coach te guía. Tus amigos son tus aliados."**
+**"Your life is the Quest. Your AI Coach guides you. Your friends are your allies."**
 
 <div align="center">
 
 ![Version](https://img.shields.io/badge/version-1.0-blue.svg)
-![Status](https://img.shields.io/badge/status-development-orange.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Status](https://img.shields.io/badge/status-in%20development-orange.svg)
+![License](https://img.shields.io/badge/license-Proprietary-red.svg)
 
 </div>
 
 ---
 
+## 🚀 What is QUEST?
+
+**QUEST** is a gamified personal coach that transforms your goals into a multiplayer game. An AI analyzes who you are today and who you want to become, creating a day-by-day plan to get you there.
+
+It's **Duolingo + Strava + Habitica + Personal Coach**, but for **YOUR ENTIRE LIFE**.
+
+### 🎯 Elevator Pitch
+
+Complete daily missions, challenge your friends with real stakes, maintain epic streaks, and literally become a better version of yourself. Not just tracking—it's **guided transformation**.
+
+---
+
+## ✨ Main Features
+
+### 🤖 AI Personal Coach
+- **Personalized transformation plan** (180 days)
+- **Adaptive daily challenges** based on your routine
+- **Pattern analysis** and progress tracking
+- **24/7 conversational chat** with your AI coach
+
+### 📊 Multidimensional System (6 Pillars)
+- 💪 **PHYSICAL**: Exercise, nutrition, health
+- 🧠 **MENTAL**: Learning, productivity
+- ❤️ **SOCIAL**: Relationships, community
+- 💼 **PROFESSIONAL**: Career, projects
+- 🕉️ **SPIRITUAL**: Inner peace, purpose
+- 🎨 **CREATIVE**: Art, hobbies
+
+### ⚔️ Challenge System
+- **Personal challenges** with streak system
+- **1v1 Duels** with real stakes
+- **Group challenges** (competitive and cooperative)
+- **Voting system** for creative punishments
+
+### 💎 Internal Economy (Quest Coins)
+- Earn **QC** by completing challenges
+- Spend on **customization** (150+ items)
+- **Boosts and power-ups**
+- **Transfers** between friends
+
+### 🎮 Deep Gamification
+- **Independent level system** per pillar (1-200)
+- **50+ unlockable achievements**
+- **Temporary badges** (daily, weekly, monthly)
+- **Visual hexagon** of personal development
+
+### 🛤️ Life Paths
+- **Long-term goals** (1-2 years)
+- Divided into **small phases** (atomic habits)
+- Examples: "Sedentary → Marathon Runner", "Beginner → Bilingual"
+- **Progress tracking** with milestones
+
+### 🔒 Anti-Cheat Verification
+- **Auto-verification** with HealthKit/Google Fit
+- **Photo/video verification** when needed
+- **Trust Score** per user
+
+---
+
+## 🏗️ Tech Stack
+
+### Frontend
+- **React Native** + Expo (SDK 54)
+- **TypeScript**
+- React Query + Zustand
+- Reanimated (60fps animations)
+
+### Backend
+- **Supabase** (PostgreSQL + Edge Functions)
+- Real-time subscriptions
+- Storage for verifications
+- Integrated Auth
+
+### AI/ML
+- **OpenAI GPT-4** API
+- Intelligent caching
+- Smart rate limiting
+
+### Integrations
+- HealthKit (iOS) / Google Fit (Android)
+- Google Calendar / Apple Calendar
+- OneSignal (Push Notifications)
+
+---
+
+## 📱 Current Development Status
+
+> ⚠️ **This project is in active development**
+
+### ✅ Completed
+- Core authentication system
+- Assessment questionnaire (40 questions)
+- 6-pillar system with levels
+- Daily challenges system
+- Social system (friends, groups)
+- Shop with 150+ items
+- 1v1 duels and group raids
+- AI Coach integration
+- HealthKit/Google Fit integration
+- RevenueCat payment system
+- Internationalization (EN/ES)
+
+### 🚧 In Progress
+- **Visual polish and UI refinements**
+- User experience improvements
+- Additional animations
+- App Store/Play Store submission preparation
+
+### 📋 Upcoming
+- Global community features
+- Brand collaborations
+- Public API
+- Web app
+
+---
+
+## 🛠️ Installation and Development
+
+### Prerequisites
+- Node.js 18+
+- Expo CLI
+- Supabase account
+- OpenAI API account
+
+### Initial Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/DelValleDev/quest.git
+
+# Navigate to app directory
+cd quest/app
+
+# Install dependencies
+npm install
+
+# Configure environment variables
+cp .env.example .env
+# Edit .env with your credentials
+
+# Run in development
+npx expo start
+```
+
+### Project Structure
+
+```
+quest/
+├── app/
+│   ├── src/
+│   │   ├── components/     # Reusable components
+│   │   ├── screens/        # App screens
+│   │   ├── services/       # APIs and services
+│   │   ├── utils/          # Utilities
+│   │   ├── hooks/          # Custom hooks
+│   │   ├── store/          # Global state (Zustand)
+│   │   └── types/          # TypeScript types
+│   └── assets/             # Images, fonts
+├── supabase/
+│   ├── functions/          # Edge Functions
+│   └── migrations/         # Database migrations
+└── docs/                   # Documentation
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+
+### Process
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+This project is **proprietary software**. See [LICENSE](./LICENSE) for more details.
+
+**⚠️ IMPORTANT:** This code is for visualization/demonstration purposes only. Copying, modifying, distributing, or using this software without written authorization is not permitted.
+
+---
+
+## 📞 Contact
+
+For questions, feedback, or collaboration:
+- **Email**: samuelrestrepodev@gmail.com
+- **GitHub**: [@DelValleDev](https://github.com/DelValleDev)
+
+---
+
+<div align="center">
+
+**Made with 💪🧠❤️ for those who want to level up their lives.**
+
+</div>
+
+---
+
+---
+
+# 🎮 QUEST (Español)
+
+**"Tu vida es la Quest. Tu IA Coach te guía. Tus amigos son tus aliados."**
+
+---
+
 ## 🚀 ¿Qué es QUEST?
 
-**QUEST** es tu coach personal gamificado que convierte tus metas en un juego multijugador. Una IA analiza quién eres hoy y quién quieres ser, y te crea un plan día a día para llegar ahí. 
+**QUEST** es un coach personal gamificado que transforma tus metas en un juego multijugador. Una IA analiza quién eres hoy y quién quieres ser, creando un plan día a día para llegar ahí.
 
 Es **Duolingo + Strava + Habitica + Coach Personal**, pero para **TODA tu vida**.
 
 ### 🎯 Elevator Pitch
 
-Completa misiones diarias, reta a tus amigos con stakes reales, mantén rachas épicas, y conviértete literalmente en una mejor versión de ti mismo. No solo tracking, es **transformación guiada**.
+Completa misiones diarias, reta a tus amigos con stakes reales, mantén rachas épicas, y conviértete literalmente en una mejor versión de ti mismo. No solo tracking—es **transformación guiada**.
 
 ---
 
 ## ✨ Características Principales
 
 ### 🤖 IA Coach Personal
-- **Plan de transformación personalizado** de 180 días
+- **Plan de transformación personalizado** (180 días)
 - **Desafíos diarios adaptativos** basados en tu rutina
-- **Análisis predictivo** de patrones y recaídas
-- **Chat conversacional** 24/7 con tu coach IA
-
-### 🎭 Quest - Tu Mascota/Coach
-- Compañero visual que **evoluciona contigo**
-- **5 personalidades** personalizables
-- **Aprende tu forma de hablar**
-- Aparece en toda la app motivándote
+- **Análisis de patrones** y seguimiento de progreso
+- **Chat conversacional 24/7** con tu coach IA
 
 ### 📊 Sistema Multidimensional (6 Pilares)
 - 💪 **FÍSICO**: Ejercicio, nutrición, salud
 - 🧠 **MENTAL**: Aprendizaje, productividad
 - ❤️ **SOCIAL**: Relaciones, comunidad
-- 💰 **PROFESIONAL**: Carrera, proyectos
+- 💼 **PROFESIONAL**: Carrera, proyectos
 - 🕉️ **ESPIRITUAL**: Paz interior, propósito
 - 🎨 **CREATIVO**: Arte, hobbies
 
 ### ⚔️ Sistema de Retos
 - **Retos personales** con sistema de rachas
 - **Duelos 1v1** con stakes reales
-- **Retos grupales** competitivos y cooperativos
+- **Retos grupales** (competitivos y cooperativos)
 - **Sistema de votación** para castigos creativos
-- **Mini-raids** cuando tus amigos están online
 
 ### 💎 Economía Interna (Quest Coins)
 - Gana **QC** completando retos
 - Gasta en **personalización** (150+ items)
-- **Boosts y power-ups** temporales
-- **Mentorías** entre usuarios
-- **Transferencias** de QC entre amigos
+- **Boosts y power-ups**
+- **Transferencias** entre amigos
 
 ### 🎮 Gamificación Profunda
-- **Sistema de niveles** independientes por pilar (1-200)
+- **Sistema de niveles independiente** por pilar (1-200)
 - **50+ logros** desbloqueables
 - **Badges temporales** (diarios, semanales, mensuales)
-- **Títulos y auras** según progreso
 - **Hexágono visual** del desarrollo personal
 
 ### 🛤️ Life Paths
-- Metas de **largo plazo** (1-2 años)
+- **Metas de largo plazo** (1-2 años)
 - Divididas en **fases pequeñas** (hábitos atómicos)
 - Ejemplos: "Sedentario → Maratonista", "Principiante → Bilingüe"
 - **Tracking de progreso** con milestones
@@ -76,93 +278,60 @@ Completa misiones diarias, reta a tus amigos con stakes reales, mantén rachas �
 ### 🔒 Verificación Anti-Trampa
 - **Auto-verificación** con HealthKit/Google Fit
 - **Verificación por foto/video** cuando es necesario
-- **Sistema de honor** para actividades no medibles
 - **Trust Score** por usuario
-- **Detección de patrones** sospechosos
 
 ---
 
 ## 🏗️ Stack Técnico
 
 ### Frontend
-- **React Native** + Expo
+- **React Native** + Expo (SDK 54)
 - **TypeScript**
 - React Query + Zustand
 - Reanimated (animaciones 60fps)
 
 ### Backend
 - **Supabase** (PostgreSQL + Edge Functions)
-- Real-time subscriptions
+- Subscripciones en tiempo real
 - Storage para verificaciones
 - Auth integrado
 
 ### IA/ML
 - **OpenAI GPT-4** API
-- Modelo predictivo local (Random Forest)
-- Caching agresivo
+- Caching inteligente
 - Rate limiting inteligente
 
 ### Integraciones
 - HealthKit (iOS) / Google Fit (Android)
-- Strava, Nike Run Club, Garmin
 - Google Calendar / Apple Calendar
-- Spotify, Apple Music, YouTube
 - OneSignal (Push Notifications)
 
-### Analytics & Monitoring
-- Mixpanel (eventos, funnels)
-- PostHog (session replays)
-- Sentry (error tracking)
-
 ---
 
-## 📱 Modelo de Negocio
+## 📱 Estado Actual del Desarrollo
 
-### Freemium
-- **Plan FREE** ($0): 3 desafíos diarios, funcionalidades básicas
-- **Plan PREMIUM** ($9.99/mes): IA completa, 5-8 desafíos personalizados, +50% bonus QC
+> ⚠️ **Este proyecto está en desarrollo activo**
 
-### In-App Purchases
-- Quest Coins (QC) desde $4.99
-- Personalización de avatares
-- Boosts y power-ups
+### ✅ Completado
+- Sistema de autenticación
+- Cuestionario de assessment (40 preguntas)
+- Sistema de 6 pilares con niveles
+- Sistema de desafíos diarios
+- Sistema social (amigos, grupos)
+- Tienda con 150+ items
+- Duelos 1v1 y raids grupales
+- Integración de AI Coach
+- Integración HealthKit/Google Fit
+- Sistema de pagos RevenueCat
+- Internacionalización (EN/ES)
 
-### Comisiones
-- **Mentorías**: 20% fee
-- **Retos con stakes**: 10% de la apuesta
+### 🚧 En Progreso
+- **Pulido visual y refinamientos de UI**
+- Mejoras en experiencia de usuario
+- Animaciones adicionales
+- Preparación para App Store/Play Store
 
----
-
-## 🗺️ Roadmap
-
-### ✅ MVP (Mes 0)
-- Core completo
-- Sistema de IA Coach
-- Sistema de retos
-- Gamificación esencial
-- Quest (mascota)
-
-### 🚧 Update 1.1 (Mes 2-3)
-- Tracker de hábitos permanentes
-- Gráficas de progreso mensual
-- Integración mejorada con calendario
-
-### 📋 Update 1.2 (Mes 3-4)
-- 100+ logros totales
-- Hall of Fame del grupo
-- Achievements 3D visuales
-
-### 🔮 Update 2.0 (Mes 5-6)
-- IA avanzado con análisis profundo
-- Predicción de recaídas mejorada
-- Sugerencias ultra-específicas
-
-### 🏆 Update 2.1 (Mes 6-7)
-- Modo Competitivo
-- Ligas semanales
-- Torneos mensuales
-
-### 🌍 Update 3.0+ (Año 2)
+### 📋 Próximamente
 - Comunidad global
 - Colaboraciones con marcas
 - API pública
@@ -170,81 +339,11 @@ Completa misiones diarias, reta a tus amigos con stakes reales, mantén rachas �
 
 ---
 
-## 🎯 Diferenciadores Clave
-
-| Feature | QUEST | Habitica | Strava | Coach Personal |
-|---------|-------|----------|--------|----------------|
-| IA Coach Personal | ✅ | ❌ | ❌ | ✅ |
-| Multidimensional (6 pilares) | ✅ | ❌ | ❌ | ✅ |
-| Retos con stakes reales | ✅ | ❌ | ⚠️ | ❌ |
-| Mascota personalizable | ✅ | ⚠️ | ❌ | ❌ |
-| Life Paths (largo plazo) | ✅ | ❌ | ❌ | ✅ |
-| Economía interna | ✅ | ✅ | ❌ | ❌ |
-| Precio | $9.99/mes | $5/mes | $12/mes | $100+/mes |
-
----
-
-## 📊 Métricas de Éxito
-
-### Mes 1
-- 5,000 downloads
-- 3,000 usuarios activos
-- 50% retención día 7
-- 100 suscripciones premium
-
-### Mes 6
-- 100,000+ downloads
-- 40,000 usuarios activos
-- 65% retención día 7
-- 4,000 suscripciones premium ($40K MRR)
-- K-factor > 1.2 (crecimiento viral)
-
----
-
-## 🚀 ¿Por Qué Va a Ser Viral?
-
-1. **Network effect**: Necesitas amigos para maximizar la experiencia
-2. **Transformaciones reales**: Contenido compartible (antes/después)
-3. **Stakes y castigos**: Engagement 10x vs apps tradicionales
-4. **Quest (mascota)**: Memorable, meme-able, cara de la marca
-5. **Gamificación adictiva**: Quieres ver esos números subir
-6. **Universal**: No solo para gamers o fitness freaks
-
----
-
-## 📖 Documentación
-
-Para la documentación completa del proyecto (45,000+ palabras), consulta [quest-doc.md](./quest-doc.md)
-
-### Contenido del documento:
-- Concepto Core detallado
-- MVP completo (funcionalidades)
-- Sistema de IA Coach
-- Sistema de Retos
-- Sistema de Monedas (QC)
-- Quest - La Mascota/Coach
-- Sistema de Niveles
-- Verificación y Anti-Trampa
-- Metas Personalizadas
-- Life Paths
-- Gamificación Avanzada
-- Social y Grupos
-- Privacidad
-- Integraciones
-- Monetización
-- Stack Técnico
-- Checklist de Desarrollo (18 semanas)
-- Roadmap completo
-- Métricas de Éxito
-- Estrategia Viral
-
----
-
 ## 🛠️ Instalación y Desarrollo
 
 ### Requisitos Previos
 - Node.js 18+
-- React Native development environment
+- Expo CLI
 - Cuenta en Supabase
 - Cuenta en OpenAI API
 
@@ -254,8 +353,10 @@ Para la documentación completa del proyecto (45,000+ palabras), consulta [quest
 # Clonar el repositorio
 git clone https://github.com/DelValleDev/quest.git
 
+# Navegar al directorio de la app
+cd quest/app
+
 # Instalar dependencias
-cd quest
 npm install
 
 # Configurar variables de entorno
@@ -263,25 +364,7 @@ cp .env.example .env
 # Edita .env con tus credenciales
 
 # Correr en desarrollo
-npm run ios     # Para iOS
-npm run android # Para Android
-```
-
-### Estructura del Proyecto
-
-```
-quest/
-├── src/
-│   ├── components/     # Componentes reutilizables
-│   ├── screens/        # Pantallas de la app
-│   ├── services/       # APIs y servicios
-│   ├── utils/          # Utilidades
-│   ├── hooks/          # Custom hooks
-│   ├── store/          # Estado global (Zustand)
-│   └── types/          # TypeScript types
-├── assets/             # Imágenes, fuentes
-├── supabase/           # Schema y funciones
-└── docs/               # Documentación
+npx expo start
 ```
 
 ---
@@ -290,20 +373,11 @@ quest/
 
 ¡Las contribuciones son bienvenidas! Por favor lee [CONTRIBUTING.md](./CONTRIBUTING.md) para más detalles.
 
-### Proceso
-1. Fork el proyecto
-2. Crea tu feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push al branch (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
 ---
 
 ## 📄 Licencia
 
 Este proyecto es **software propietario**. Ver [LICENSE](./LICENSE) para más detalles.
-
-**⚠️ IMPORTANTE:** Este código es solo para visualización/demostración. No está permitido copiar, modificar, distribuir o usar este software sin autorización escrita.
 
 ---
 
@@ -315,18 +389,8 @@ Para preguntas, feedback o colaboración:
 
 ---
 
-## 🙏 Agradecimientos
-
-- Inspirado por apps como Duolingo, Strava, y Habitica
-- Gracias a la comunidad de desarrollo de React Native
-- A todos los beta testers que ayudaron a mejorar QUEST
-
----
-
 <div align="center">
 
-**Made with 💪🧠❤️ for those who want to level up their lives.**
-
-[Descargar en App Store](#) | [Descargar en Google Play](#)
+**Hecho con 💪🧠❤️ para quienes quieren subir de nivel en la vida.**
 
 </div>

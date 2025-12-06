@@ -66,5 +66,11 @@ build/
 supabase/.branches
 supabase/.temp
 
+# Private/Sensitive Documentation
+# These files contain business strategy, pricing, and internal documentation
+quest-doc.md
+docs/REVENUCAT_SETUP.md
+.private/
+
 # Misc
 *.pem
