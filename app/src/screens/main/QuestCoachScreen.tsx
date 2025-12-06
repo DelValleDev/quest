@@ -11,10 +11,11 @@ import {
   Animated,
   Dimensions,
   Alert,
+  Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import questAI from '../../lib/openai';
@@ -133,9 +134,14 @@ const QUICK_REPLIES = [
 
 export const QuestCoachScreen: React.FC = () => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -148,7 +154,20 @@ export const QuestCoachScreen: React.FC = () => {
   const [isPremium, setIsPremium] = useState(true); // Default true to not block initially
   const [showPaywall, setShowPaywall] = useState(false);
   const [dailyMessagesUsed, setDailyMessagesUsed] = useState(0);
+  const [currentSessionId, setCurrentSessionId] = useState<string>(Date.now().toString());
   const FREE_DAILY_LIMIT = 5; // Free users get 5 messages per day
+
+  // Start new chat
+  const startNewChat = async () => {
+    const newSessionId = Date.now().toString();
+    setCurrentSessionId(newSessionId);
+    setMessages([]);
+    
+    // Send a new greeting
+    if (userContext) {
+      sendInitialGreeting(userContext);
+    }
+  };
 
   // Mascot thinking animation
   const startTypingAnimation = () => {
@@ -278,26 +297,54 @@ export const QuestCoachScreen: React.FC = () => {
     }
   };
 
-  const sendInitialGreeting = (context: UserContext) => {
-    const greeting = getRandomItem(COACH_RESPONSES.greeting)
-      .replace('{name}', context.displayName);
-    
-    addBotMessage(greeting);
+  const sendInitialGreeting = async (context: UserContext) => {
+    // Check if this is the user's FIRST TIME EVER chatting (not just today)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-    // Add context-aware follow-up
-    setTimeout(() => {
-      if (context.currentStreak >= 3) {
-        const streakMsg = getRandomItem(COACH_RESPONSES.streakCelebration)
-          .replace('{name}', context.displayName)
-          .replace('{streak}', String(context.currentStreak));
-        addBotMessage(streakMsg);
-      } else if (!context.assessmentCompleted) {
-        addBotMessage("🎯 Te recomiendo completar el Assessment inicial para personalizar tu experiencia.");
-      } else if (context.weakestPillar) {
-        const pillar = PILLARS.find(p => p.id === context.weakestPillar);
-        addBotMessage(`📊 Veo que ${pillar?.name || context.weakestPillar} podría usar algo de atención. ¿Quieres algunos consejos?`);
-      }
-    }, 1500);
+    const { count: totalMessageCount } = await supabase
+      .from('chat_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
+    const isFirstTimeEver = (totalMessageCount || 0) === 0;
+
+    if (isFirstTimeEver) {
+      // First time onboarding - AI asks questions to get to know user
+      const welcomeMessage = `¡Hola ${context.displayName}! 🎉 Soy Quest, tu coach de desarrollo personal.
+
+Estoy aquí para ayudarte a convertirte en tu mejor versión. Pero primero, quiero conocerte mejor para darte la mejor experiencia posible.
+
+🤔 **Cuéntame sobre ti:**
+• ¿Qué área de tu vida te gustaría mejorar más? (salud, mente, relaciones, trabajo, espiritualidad, creatividad)
+• ¿Hay algo específico que sientas que necesitas cambiar?
+• ¿Cuál es tu mayor meta para los próximos meses?
+
+Respóndeme como quieras - con una palabra, una oración, o cuéntame todo. ¡Todo me ayuda a conocerte mejor! 💪`;
+      
+      addBotMessage(welcomeMessage);
+    } else {
+      // Regular greeting for returning users
+      const greeting = getRandomItem(COACH_RESPONSES.greeting)
+        .replace('{name}', context.displayName);
+      
+      addBotMessage(greeting);
+
+      // Add context-aware follow-up
+      setTimeout(() => {
+        if (context.currentStreak >= 3) {
+          const streakMsg = getRandomItem(COACH_RESPONSES.streakCelebration)
+            .replace('{name}', context.displayName)
+            .replace('{streak}', String(context.currentStreak));
+          addBotMessage(streakMsg);
+        } else if (!context.assessmentCompleted) {
+          addBotMessage("🎯 Te recomiendo completar el Assessment inicial para personalizar tu experiencia.");
+        } else if (context.weakestPillar) {
+          const pillar = PILLARS.find(p => p.id === context.weakestPillar);
+          addBotMessage(`📊 Veo que ${pillar?.name || context.weakestPillar} podría usar algo de atención. ¿Quieres algunos consejos?`);
+        }
+      }, 1500);
+    }
   };
 
   const getRandomItem = <T,>(arr: T[]): T => {
@@ -466,12 +513,9 @@ export const QuestCoachScreen: React.FC = () => {
           🤖
         </Animated.Text>
         <View style={styles.headerInfo}>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Quest Coach</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>{t('Quest Coach', 'Quest Coach')}</Text>
           <Text style={[styles.headerStatus, { color: isTyping ? theme.primary : theme.success }]}>
-            {isTyping ? 'Pensando...' : 'En línea'}
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-            Tu coach personal con acceso total a tus datos
+            {isTyping ? t('Thinking...', 'Pensando...') : t('Online', 'En línea')}
           </Text>
         </View>
         <TouchableOpacity 
@@ -482,6 +526,12 @@ export const QuestCoachScreen: React.FC = () => {
           }}
         >
           <Text style={{ fontSize: 20 }}>📚</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.historyButton, { backgroundColor: theme.success + '20', marginLeft: 8 }]}
+          onPress={startNewChat}
+        >
+          <Text style={{ fontSize: 20 }}>➕</Text>
         </TouchableOpacity>
       </View>
 
@@ -559,7 +609,7 @@ export const QuestCoachScreen: React.FC = () => {
       <View style={[styles.inputContainer, { backgroundColor: theme.surface }]}>
         <TextInput
           style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
-          placeholder="Escribe un mensaje..."
+          placeholder={t('Write a message...', 'Escribe un mensaje...')}
           placeholderTextColor={theme.textSecondary}
           value={inputText}
           onChangeText={setInputText}
@@ -586,7 +636,7 @@ export const QuestCoachScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Conversaciones Pasadas 📚</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{t('Past Conversations 📚', 'Conversaciones Pasadas 📚')}</Text>
               <TouchableOpacity onPress={() => setShowConversationList(false)}>
                 <Text style={{ fontSize: 24, color: theme.text }}>✕</Text>
               </TouchableOpacity>
@@ -609,7 +659,7 @@ export const QuestCoachScreen: React.FC = () => {
                   }}
                 >
                   <Text style={[styles.conversationDate, { color: theme.text }]}>
-                    {new Date(conv.day).toLocaleDateString('es-ES', { 
+                    {new Date(conv.day).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { 
                       weekday: 'long', 
                       year: 'numeric', 
                       month: 'long', 
@@ -617,14 +667,14 @@ export const QuestCoachScreen: React.FC = () => {
                     })}
                   </Text>
                   <Text style={[styles.conversationPreview, { color: theme.textSecondary }]}>
-                    {conv.messageCount} mensajes - {conv.lastMessage}
+                    {conv.messageCount} {t('messages', 'mensajes')} - {conv.lastMessage}
                   </Text>
                 </TouchableOpacity>
               ))}
               
               {conversations.length === 0 && (
                 <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                  No hay conversaciones pasadas
+                  {t('No past conversations', 'No hay conversaciones pasadas')}
                 </Text>
               )}
             </ScrollView>

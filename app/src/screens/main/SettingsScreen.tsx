@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useThemeStore, useAuthStore } from "../../store";
+import { useThemeStore, useAuthStore, useLanguageStore } from "../../store";
 import { getTheme } from "../../theme/colors";
 import { CalendarService, type CalendarIntegration } from "../../lib/calendar";
 import type { RootStackParamList } from "../../../App";
@@ -40,7 +40,11 @@ export const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { mode, toggleTheme } = useThemeStore();
   const { user, signOut } = useAuthStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const [loading, setLoading] = useState(false);
   const [calendarStatus, setCalendarStatus] = useState<CalendarIntegration | null>(null);
@@ -71,14 +75,14 @@ export const SettingsScreen: React.FC = () => {
       
       if (success) {
         Alert.alert(
-          "¡Conectado! 📅",
-          "Tu Google Calendar se ha conectado correctamente.",
+          t('Connected! 📅', '¡Conectado! 📅'),
+          t('Your Google Calendar has been connected successfully.', 'Tu Google Calendar se ha conectado correctamente.'),
           [{ text: "OK" }]
         );
         await loadCalendarStatus();
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message || "No se pudo conectar el calendario");
+      Alert.alert(t('Error', 'Error'), error.message || t('Could not connect calendar', 'No se pudo conectar el calendario'));
     } finally {
       setLoading(false);
     }
@@ -88,12 +92,12 @@ export const SettingsScreen: React.FC = () => {
     if (!user) return;
 
     Alert.alert(
-      "Desconectar Calendario",
-      "¿Seguro que quieres desconectar tu calendario? Tus eventos importados se mantendrán.",
+      t('Disconnect Calendar', 'Desconectar Calendario'),
+      t('Are you sure you want to disconnect your calendar? Your imported events will remain.', '¿Seguro que quieres desconectar tu calendario? Tus eventos importados se mantendrán.'),
       [
-        { text: "Cancelar", style: "cancel" },
+        { text: t('Cancel', 'Cancelar'), style: "cancel" },
         {
-          text: "Desconectar",
+          text: t('Disconnect', 'Desconectar'),
           style: "destructive",
           onPress: async () => {
             await CalendarService.disconnectCalendar(user.id);
@@ -110,7 +114,7 @@ export const SettingsScreen: React.FC = () => {
     try {
       setSyncing(true);
       await CalendarService.syncGoogleCalendar(user.id);
-      Alert.alert("¡Sincronizado!", "Tus eventos se han actualizado");
+      Alert.alert(t('Synced!', '¡Sincronizado!'), t('Your events have been updated', 'Tus eventos se han actualizado'));
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
@@ -120,12 +124,12 @@ export const SettingsScreen: React.FC = () => {
 
   const handleSignOut = () => {
     Alert.alert(
-      "Cerrar Sesión",
-      "¿Estás seguro que quieres cerrar sesión?",
+      t('Sign Out', 'Cerrar Sesión'),
+      t('Are you sure you want to sign out?', '¿Estás seguro que quieres cerrar sesión?'),
       [
-        { text: "Cancelar", style: "cancel" },
+        { text: t('Cancel', 'Cancelar'), style: "cancel" },
         {
-          text: "Cerrar Sesión",
+          text: t('Sign Out', 'Cerrar Sesión'),
           style: "destructive",
           onPress: async () => {
             await signOut();
@@ -137,15 +141,15 @@ export const SettingsScreen: React.FC = () => {
 
   const sections: SettingSection[] = [
     {
-      title: "Integraciones",
+      title: t("Integrations", "Integraciones"),
       items: [
         {
           id: "google_calendar",
           icon: "📅",
           title: "Google Calendar",
           subtitle: calendarStatus?.connected
-            ? `Última sincronización: ${calendarStatus.last_sync ? new Date(calendarStatus.last_sync).toLocaleDateString() : "Nunca"}`
-            : "Sincroniza tus eventos automáticamente",
+            ? t(`Last sync: ${calendarStatus.last_sync ? new Date(calendarStatus.last_sync).toLocaleDateString() : "Never"}`, `Última sincronización: ${calendarStatus.last_sync ? new Date(calendarStatus.last_sync).toLocaleDateString() : "Nunca"}`)
+            : t("Sync your events automatically", "Sincroniza tus eventos automáticamente"),
           type: "status",
           status: syncing
             ? "syncing"
@@ -160,30 +164,30 @@ export const SettingsScreen: React.FC = () => {
           id: "apple_calendar",
           icon: "🍎",
           title: "Apple Calendar",
-          subtitle: "Próximamente",
+          subtitle: t("Coming soon", "Próximamente"),
           type: "button",
           onPress: () =>
-            Alert.alert("Próximamente", "Esta función estará disponible pronto"),
+            Alert.alert(t("Coming soon", "Próximamente"), t("This feature will be available soon", "Esta función estará disponible pronto")),
         },
         {
           id: "notion",
           icon: "📝",
           title: "Notion",
-          subtitle: "Próximamente",
+          subtitle: t("Coming soon", "Próximamente"),
           type: "button",
           onPress: () =>
-            Alert.alert("Próximamente", "Esta función estará disponible pronto"),
+            Alert.alert(t("Coming soon", "Próximamente"), t("This feature will be available soon", "Esta función estará disponible pronto")),
         },
       ],
     },
     {
-      title: "Notificaciones",
+      title: t("Notifications", "Notificaciones"),
       items: [
         {
           id: "push_enabled",
           icon: "🔔",
-          title: "Notificaciones Push",
-          subtitle: "Recibe alertas importantes",
+          title: t("Push Notifications", "Notificaciones Push"),
+          subtitle: t("Receive important alerts", "Recibe alertas importantes"),
           type: "toggle",
           value: pushEnabled,
           onToggle: setPushEnabled,
@@ -191,8 +195,8 @@ export const SettingsScreen: React.FC = () => {
         {
           id: "quest_reminders",
           icon: "⏰",
-          title: "Recordatorios de Quests",
-          subtitle: "Recordatorios diarios para completar quests",
+          title: t("Quest Reminders", "Recordatorios de Quests"),
+          subtitle: t("Daily reminders to complete quests", "Recordatorios diarios para completar quests"),
           type: "toggle",
           value: questReminders,
           onToggle: setQuestReminders,
@@ -200,8 +204,8 @@ export const SettingsScreen: React.FC = () => {
         {
           id: "duel_notifications",
           icon: "⚔️",
-          title: "Notificaciones de Duelos",
-          subtitle: "Cuando alguien te reta o ganas",
+          title: t("Duel Notifications", "Notificaciones de Duelos"),
+          subtitle: t("When someone challenges you or you win", "Cuando alguien te reta o ganas"),
           type: "toggle",
           value: duelNotifications,
           onToggle: setDuelNotifications,
@@ -209,8 +213,8 @@ export const SettingsScreen: React.FC = () => {
         {
           id: "friend_activity",
           icon: "👥",
-          title: "Actividad de Amigos",
-          subtitle: "Ver logros de tus amigos",
+          title: t("Friend Activity", "Actividad de Amigos"),
+          subtitle: t("See your friends' achievements", "Ver logros de tus amigos"),
           type: "toggle",
           value: friendActivity,
           onToggle: setFriendActivity,
@@ -218,13 +222,13 @@ export const SettingsScreen: React.FC = () => {
       ],
     },
     {
-      title: "Apariencia",
+      title: t("Appearance", "Apariencia"),
       items: [
         {
           id: "dark_mode",
           icon: "🌙",
-          title: "Modo Oscuro",
-          subtitle: mode === "dark" ? "Activado" : "Desactivado",
+          title: t("Dark Mode", "Modo Oscuro"),
+          subtitle: mode === "dark" ? t("Enabled", "Activado") : t("Disabled", "Desactivado"),
           type: "toggle",
           value: mode === "dark",
           onToggle: toggleTheme,
@@ -232,74 +236,74 @@ export const SettingsScreen: React.FC = () => {
       ],
     },
     {
-      title: "Cuenta",
+      title: t("Account", "Cuenta"),
       items: [
         {
           id: "my_plan",
           icon: "👑",
-          title: "Mi Plan",
-          subtitle: "Ver suscripción y beneficios",
+          title: t("My Plan", "Mi Plan"),
+          subtitle: t("View subscription and benefits", "Ver suscripción y beneficios"),
           type: "link",
           onPress: () => navigation.navigate("MyPlan"),
         },
         {
           id: "buy_coins",
           icon: "🪙",
-          title: "Comprar Quest Coins",
-          subtitle: "Obtén más QC para desbloquear funciones",
+          title: t("Buy Quest Coins", "Comprar Quest Coins"),
+          subtitle: t("Get more QC to unlock features", "Obtén más QC para desbloquear funciones"),
           type: "link",
           onPress: () => navigation.navigate("BuyCoins"),
         },
         {
           id: "referrals",
           icon: "🎁",
-          title: "Invitar Amigos",
-          subtitle: "Gana 250 QC por cada amigo",
+          title: t("Invite Friends", "Invitar Amigos"),
+          subtitle: t("Earn 250 QC per friend", "Gana 250 QC por cada amigo"),
           type: "link",
-          onPress: () => Alert.alert("Próximamente", "Sistema de referidos en desarrollo"),
+          onPress: () => Alert.alert(t("Coming soon", "Próximamente"), t("Referral system in development", "Sistema de referidos en desarrollo")),
         },
       ],
     },
     {
-      title: "Soporte",
+      title: t("Support", "Soporte"),
       items: [
         {
           id: "help",
           icon: "❓",
-          title: "Ayuda y FAQ",
+          title: t("Help & FAQ", "Ayuda y FAQ"),
           type: "link",
-          onPress: () => Alert.alert("Ayuda", "Centro de ayuda próximamente"),
+          onPress: () => Alert.alert(t("Help", "Ayuda"), t("Help center coming soon", "Centro de ayuda próximamente")),
         },
         {
           id: "feedback",
           icon: "💬",
-          title: "Enviar Feedback",
+          title: t("Send Feedback", "Enviar Feedback"),
           type: "link",
-          onPress: () => Alert.alert("Feedback", "Gracias por tu interés. Próximamente."),
+          onPress: () => Alert.alert(t("Feedback", "Feedback"), t("Thanks for your interest. Coming soon.", "Gracias por tu interés. Próximamente.")),
         },
         {
           id: "privacy",
           icon: "🔒",
-          title: "Política de Privacidad",
+          title: t("Privacy Policy", "Política de Privacidad"),
           type: "link",
           onPress: () => {},
         },
         {
           id: "terms",
           icon: "📄",
-          title: "Términos de Servicio",
+          title: t("Terms of Service", "Términos de Servicio"),
           type: "link",
           onPress: () => {},
         },
       ],
     },
     {
-      title: "Sesión",
+      title: t("Session", "Sesión"),
       items: [
         {
           id: "signout",
           icon: "🚪",
-          title: "Cerrar Sesión",
+          title: t("Sign Out", "Cerrar Sesión"),
           type: "button",
           onPress: handleSignOut,
         },
@@ -348,12 +352,12 @@ export const SettingsScreen: React.FC = () => {
                 <>
                   <View style={[styles.statusDot, { backgroundColor: "#22C55E" }]} />
                   <Text style={[styles.statusText, { color: "#22C55E" }]}>
-                    Conectado
+                    {t('Connected', 'Conectado')}
                   </Text>
                 </>
               ) : (
                 <Text style={[styles.connectText, { color: "#8B5CF6" }]}>
-                  Conectar
+                  {t('Connect', 'Conectar')}
                 </Text>
               )}
             </View>
@@ -381,7 +385,7 @@ export const SettingsScreen: React.FC = () => {
         onPress={handleDisconnectCalendar}
       >
         <Text style={[styles.disconnectText, { color: "#EF4444" }]}>
-          Desconectar Google Calendar
+          {t('Disconnect Google Calendar', 'Desconectar Google Calendar')}
         </Text>
       </TouchableOpacity>
     );
@@ -397,7 +401,7 @@ export const SettingsScreen: React.FC = () => {
         >
           <Text style={[styles.backIcon, { color: theme.text }]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.text }]}>Configuración</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('Settings', 'Configuración')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -405,7 +409,7 @@ export const SettingsScreen: React.FC = () => {
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#8B5CF6" />
           <Text style={[styles.loadingText, { color: theme.text }]}>
-            Conectando...
+            {t('Connecting...', 'Conectando...')}
           </Text>
         </View>
       )}

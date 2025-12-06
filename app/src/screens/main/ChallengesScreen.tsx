@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import type { RootStackParamList } from '../../../App';
@@ -45,11 +45,11 @@ const PILLAR_COLORS: Record<string, string> = {
   creative: '#F97316',
 };
 
-const DIFFICULTY_XP: Record<string, { label: string; color: string }> = {
-  easy: { label: 'Easy', color: '#22C55E' },
-  medium: { label: 'Medium', color: '#F59E0B' },
-  hard: { label: 'Hard', color: '#EF4444' },
-  epic: { label: 'Epic', color: '#8B5CF6' },
+const DIFFICULTY_XP: Record<string, { label: string; labelEs: string; color: string }> = {
+  easy: { label: 'Easy', labelEs: 'Fácil', color: '#22C55E' },
+  medium: { label: 'Medium', labelEs: 'Normal', color: '#F59E0B' },
+  hard: { label: 'Hard', labelEs: 'Difícil', color: '#EF4444' },
+  epic: { label: 'Epic', labelEs: 'Épico', color: '#8B5CF6' },
 };
 
 interface ChallengesScreenProps {
@@ -58,8 +58,13 @@ interface ChallengesScreenProps {
 
 export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = false }) => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
+  
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [activeChallenges, setActiveChallenges] = useState<ActiveChallenge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,34 +170,58 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
           .eq('id', user.id);
       }
 
-      // Update pillar progress
-      const { data: pillar } = await supabase
-        .from('user_pillars')
-        .select('current_xp, level, challenges_completed')
-        .eq('user_id', user.id)
-        .eq('pillar_id', challenge.pillar_id)
-        .single();
+      // Update pillar progress using RPC (respects active/inactive pillars)
+      try {
+        const { error: pillarError } = await supabase.rpc('add_pillar_xp', {
+          p_user_id: user.id,
+          p_pillar_id: challenge.pillar_id,
+          p_xp_amount: challenge.xp_reward,
+        });
 
-      if (pillar) {
-        const newPillarXp = pillar.current_xp + challenge.xp_reward;
-        const xpNeeded = pillar.level * 100;
-        const newPillarLevel = newPillarXp >= xpNeeded ? pillar.level + 1 : pillar.level;
-        
-        await supabase
-          .from('user_pillars')
-          .update({
-            current_xp: newPillarXp >= xpNeeded ? newPillarXp - xpNeeded : newPillarXp,
-            level: newPillarLevel,
-            challenges_completed: pillar.challenges_completed + 1,
-          })
-          .eq('user_id', user.id)
-          .eq('pillar_id', challenge.pillar_id);
+        if (pillarError) {
+          // Fallback if RPC doesn't exist yet
+          console.warn('add_pillar_xp RPC not found, using fallback');
+          const { data: pillar } = await supabase
+            .from('user_pillars')
+            .select('current_xp, level, challenges_completed, is_active')
+            .eq('user_id', user.id)
+            .eq('pillar_id', challenge.pillar_id)
+            .single();
+
+          if (pillar && pillar.is_active !== false) {
+            const newPillarXp = pillar.current_xp + challenge.xp_reward;
+            const xpNeeded = pillar.level * 100;
+            const newPillarLevel = newPillarXp >= xpNeeded ? pillar.level + 1 : pillar.level;
+            
+            await supabase
+              .from('user_pillars')
+              .update({
+                current_xp: newPillarXp >= xpNeeded ? newPillarXp - xpNeeded : newPillarXp,
+                level: newPillarLevel,
+                challenges_completed: pillar.challenges_completed + 1,
+              })
+              .eq('user_id', user.id)
+              .eq('pillar_id', challenge.pillar_id);
+          } else if (pillar) {
+            // Inactive pillar: store XP for later
+            await supabase
+              .from('user_pillars')
+              .update({
+                inactive_xp: (pillar as any).inactive_xp || 0 + challenge.xp_reward,
+                challenges_completed: pillar.challenges_completed + 1,
+              })
+              .eq('user_id', user.id)
+              .eq('pillar_id', challenge.pillar_id);
+          }
+        }
+      } catch (xpError) {
+        console.warn('Error updating pillar XP:', xpError);
       }
 
       Alert.alert(
-        '🎉 Quest Complete!', 
-        `You earned +${challenge.xp_reward} XP and +${challenge.coin_reward} 🪙!`,
-        [{ text: 'Awesome!', onPress: fetchChallenges }]
+        t('🎉 Quest Complete!', '🎉 ¡Misión Completada!'), 
+        t(`You earned +${challenge.xp_reward} XP and +${challenge.coin_reward} 🪙!`, `¡Ganaste +${challenge.xp_reward} XP y +${challenge.coin_reward} 🪙!`),
+        [{ text: t('Awesome!', '¡Genial!'), onPress: fetchChallenges }]
       );
     } catch (error) {
       console.error('Error completing challenge:', error);
@@ -200,12 +229,12 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
   };
 
   const pillars = [
-    { id: 'physical', icon: '💪', name: 'Physical' },
-    { id: 'mental', icon: '🧠', name: 'Mental' },
-    { id: 'social', icon: '👥', name: 'Social' },
-    { id: 'professional', icon: '💼', name: 'Professional' },
-    { id: 'spiritual', icon: '✨', name: 'Spiritual' },
-    { id: 'creative', icon: '🎨', name: 'Creative' },
+    { id: 'physical', icon: '💪', name: t('Physical', 'Físico') },
+    { id: 'mental', icon: '🧠', name: t('Mental', 'Mental') },
+    { id: 'social', icon: '👥', name: t('Social', 'Social') },
+    { id: 'professional', icon: '💼', name: t('Professional', 'Profesional') },
+    { id: 'spiritual', icon: '✨', name: t('Spiritual', 'Espiritual') },
+    { id: 'creative', icon: '🎨', name: t('Creative', 'Creativo') },
   ];
 
   return (
@@ -213,9 +242,9 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
       {/* Header - hide when embedded */}
       {!embedded && (
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Quests</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('Quests', 'Misiones')}</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {activeTab === 'available' ? 'Choose your quest' : `${activeChallenges.length} active quests`}
+          {activeTab === 'available' ? t('Choose your quest', 'Elige tu misión') : t(`${activeChallenges.length} active quests`, `${activeChallenges.length} misiones activas`)}
         </Text>
       </View>
       )}
@@ -229,9 +258,9 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
         <View style={styles.duelsContent}>
           <Text style={styles.duelsIcon}>⚔️</Text>
           <View style={styles.duelsTextContainer}>
-            <Text style={[styles.duelsTitle, { color: theme.text }]}>1v1 Duels</Text>
+            <Text style={[styles.duelsTitle, { color: theme.text }]}>{t('1v1 Duels', 'Duelos 1v1')}</Text>
             <Text style={[styles.duelsSubtitle, { color: theme.textSecondary }]}>
-              Challenge your friends and bet Quest Coins!
+              {t('Challenge your friends and bet Quest Coins!', '¡Desafía a tus amigos y apuesta Quest Coins!')}
             </Text>
           </View>
         </View>
@@ -249,7 +278,7 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
           onPress={() => setActiveTab('available')}
         >
           <Text style={[styles.tabText, { color: activeTab === 'available' ? '#FFF' : theme.textSecondary }]}>
-            Available
+            {t('Available', 'Disponibles')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -260,7 +289,7 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
           onPress={() => setActiveTab('active')}
         >
           <Text style={[styles.tabText, { color: activeTab === 'active' ? '#FFF' : theme.textSecondary }]}>
-            Active ({activeChallenges.length})
+            {t(`Active (${activeChallenges.length})`, `Activas (${activeChallenges.length})`)}
           </Text>
         </TouchableOpacity>
       </View>
@@ -281,7 +310,7 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
             onPress={() => setSelectedPillar(null)}
           >
             <Text style={[styles.filterText, { color: !selectedPillar ? '#FFF' : theme.text }]}>
-              All
+              {t('All', 'Todas')}
             </Text>
           </TouchableOpacity>
           {pillars.map((pillar) => (
@@ -326,7 +355,7 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🎯</Text>
               <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                No active quests. Start one from Available!
+                {t('No active quests. Start one from Available!', '¡No hay misiones activas. ¡Empieza una desde Disponibles!')}
               </Text>
             </View>
           ) : (
@@ -342,11 +371,11 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
                 ]}
                 onPress={() => {
                   Alert.alert(
-                    'Complete Quest?',
-                    `Did you finish "${active.challenge.title}"?`,
+                    t('Complete Quest?', '¿Completar Misión?'),
+                    t(`Did you finish "${active.challenge.title}"?`, `¿Terminaste "${active.challenge.title}"?`),
                     [
-                      { text: 'Not yet', style: 'cancel' },
-                      { text: '✅ Complete!', onPress: () => completeChallenge(active) },
+                      { text: t('Not yet', 'Aún no'), style: 'cancel' },
+                      { text: t('✅ Complete!', '✅ ¡Completar!'), onPress: () => completeChallenge(active) },
                     ]
                   );
                 }}
@@ -359,7 +388,7 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
                       {active.challenge.title}
                     </Text>
                     <Text style={[styles.challengeDesc, { color: theme.textSecondary }]}>
-                      Tap to complete and earn rewards!
+                      {t('Tap to complete and earn rewards!', '¡Toca para completar y ganar recompensas!')}
                     </Text>
                   </View>
                 </View>
@@ -374,7 +403,7 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
                     </Text>
                   </View>
                   <View style={[styles.tag, { backgroundColor: '#22C55E' }]}>
-                    <Text style={styles.tagText}>In Progress</Text>
+                    <Text style={styles.tagText}>{t('In Progress', 'En Progreso')}</Text>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -420,7 +449,7 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
               <View style={styles.tagsContainer}>
                 {challenge.is_daily && (
                   <View style={[styles.tag, { backgroundColor: '#3B82F6' }]}>
-                    <Text style={styles.tagText}>Daily</Text>
+                    <Text style={styles.tagText}>{t('Daily', 'Diaria')}</Text>
                   </View>
                 )}
                 <View
@@ -430,7 +459,9 @@ export const ChallengesScreen: React.FC<ChallengesScreenProps> = ({ embedded = f
                   ]}
                 >
                   <Text style={styles.tagText}>
-                    {DIFFICULTY_XP[challenge.difficulty]?.label || challenge.difficulty}
+                    {language === 'es' 
+                      ? (DIFFICULTY_XP[challenge.difficulty]?.labelEs || challenge.difficulty)
+                      : (DIFFICULTY_XP[challenge.difficulty]?.label || challenge.difficulty)}
                   </Text>
                 </View>
                 {challenge.duration_minutes && (

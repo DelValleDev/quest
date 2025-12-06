@@ -8,7 +8,8 @@ import {
   SafeAreaView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useThemeStore } from '../../store';
+import { useNavigation } from '@react-navigation/native';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { setLanguage } from '../../lib/i18n';
 
@@ -27,15 +28,17 @@ const languages: Language[] = [
 ];
 
 interface LanguageSelectionScreenProps {
-  onLanguageSelected: () => void;
+  onLanguageSelected?: () => void;
 }
 
 export const LanguageSelectionScreen: React.FC<LanguageSelectionScreenProps> = ({
   onLanguageSelected,
 }) => {
   const { mode } = useThemeStore();
+  const { language: currentLanguage, setLanguage: setStoreLanguage } = useLanguageStore();
   const theme = getTheme(mode);
-  const [selectedLanguage, setSelectedLanguage] = React.useState<string | null>(null);
+  const navigation = useNavigation();
+  const [selectedLanguage, setSelectedLanguage] = React.useState<string | null>(currentLanguage);
 
   const handleSelectLanguage = async (code: string) => {
     setSelectedLanguage(code);
@@ -43,17 +46,35 @@ export const LanguageSelectionScreen: React.FC<LanguageSelectionScreenProps> = (
     // Set the locale
     setLanguage(code as 'en' | 'es');
     
+    // Update store
+    setStoreLanguage(code as 'en' | 'es');
+    
     // Save to AsyncStorage for persistence
     await AsyncStorage.setItem('user_language', code);
     
     // Small delay for visual feedback
     setTimeout(() => {
-      onLanguageSelected();
+      if (onLanguageSelected) {
+        onLanguageSelected();
+      } else {
+        // If no callback, go back (accessed from settings)
+        navigation.goBack();
+      }
     }, 200);
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* Back button when accessed from settings */}
+      {!onLanguageSelected && (
+        <TouchableOpacity 
+          style={{ position: 'absolute', top: 60, left: 20, zIndex: 10, padding: 8 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={{ fontSize: 24, color: theme.text }}>←</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Logo/Icon */}
       <View style={styles.logoContainer}>
         <Text style={styles.logoEmoji}>🌍</Text>

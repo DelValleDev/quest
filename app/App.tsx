@@ -37,6 +37,11 @@ import {
 } from './src/screens';
 import { LifePathsScreen } from './src/screens/main/LifePathsScreen';
 import { LifePathDetailScreen } from './src/screens/main/LifePathDetailScreen';
+import { ManagePillarsScreen } from './src/screens/main/ManagePillarsScreen';
+import { GuildFeedScreen } from './src/screens/guilds/GuildFeedScreen';
+import { GuildChatScreen } from './src/screens/guilds/GuildChatScreen';
+import { RaidPenaltyProposalScreen } from './src/screens/main/RaidPenaltyProposalScreen';
+import { RaidPenaltyVotingScreen } from './src/screens/main/RaidPenaltyVotingScreen';
 import { MainTabs } from './src/navigation';
 import * as Linking from 'expo-linking';
 
@@ -65,9 +70,14 @@ export type RootStackParamList = {
   WeeklyReview: undefined;
   OnboardingTutorial: undefined;
   ClassSelection: { onboarding?: boolean };
+  ManagePillars: undefined;
   Assessment: { onboarding?: boolean };
   AssessmentResults: { scores: Record<string, number>; onboarding?: boolean };
   Aspirations: { onboarding?: boolean };
+  GuildFeed: { guildId: string; guildName: string };
+  GuildChat: { guildId: string; guildName: string };
+  RaidPenaltyProposal: { raidId: string; loserId: string };
+  RaidPenaltyVoting: { raidId: string };
   // Onboarding flow
   OnboardingAssessment: undefined;
   OnboardingClassSelection: undefined;
@@ -255,10 +265,10 @@ export default function App() {
 
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        notificationListener.current.remove();
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        responseListener.current.remove();
       }
     };
   }, [session?.user?.id]);
@@ -402,6 +412,26 @@ export default function App() {
               options={{ presentation: 'card', animation: 'slide_from_right' }}
             />
             <Stack.Screen 
+              name="GuildChat" 
+              component={GuildChatScreen}
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen 
+              name="GuildFeed" 
+              component={GuildFeedScreen}
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen 
+              name="RaidPenaltyProposal" 
+              component={RaidPenaltyProposalScreen}
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen 
+              name="RaidPenaltyVoting" 
+              component={RaidPenaltyVotingScreen}
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen 
               name="Achievements" 
               component={AchievementsScreen}
               options={{ presentation: 'card', animation: 'slide_from_right' }}
@@ -409,6 +439,11 @@ export default function App() {
             <Stack.Screen 
               name="ClassSelection" 
               component={ClassSelectionScreen}
+              options={{ presentation: 'card', animation: 'slide_from_right' }}
+            />
+            <Stack.Screen 
+              name="ManagePillars" 
+              component={ManagePillarsScreen}
               options={{ presentation: 'card', animation: 'slide_from_right' }}
             />
             <Stack.Screen 
@@ -465,6 +500,11 @@ export default function App() {
               name="OnboardingTutorial" 
               component={OnboardingTutorialScreen}
               options={{ presentation: 'fullScreenModal', gestureEnabled: false }}
+            />
+            <Stack.Screen 
+              name="LanguageSelection" 
+              component={LanguageSelectionScreen}
+              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
             />
           </>
         )}

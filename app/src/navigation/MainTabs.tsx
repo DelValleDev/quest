@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useThemeStore } from '../store';
+import { useThemeStore, useLanguageStore } from '../store';
 import { getTheme } from '../theme/colors';
 import { HomeScreen } from '../screens/main/HomeScreen';
 import { JourneyHubScreen } from '../screens/main/JourneyHubScreen';
@@ -30,7 +30,10 @@ const TabIcon: React.FC<TabIconProps> = ({ focused, icon, label, color }) => (
 
 export const MainTabs: React.FC = () => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
+  
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   return (
     <Tab.Navigator
@@ -43,10 +46,16 @@ export const MainTabs: React.FC = () => {
           height: 85,
           paddingTop: 8,
           paddingBottom: 25,
+          paddingHorizontal: 10,
         },
         tabBarShowLabel: false,
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.textMuted,
+        tabBarItemStyle: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
       }}
     >
       <Tab.Screen
@@ -54,7 +63,7 @@ export const MainTabs: React.FC = () => {
         component={HomeScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon focused={focused} icon="🏠" label="Home" color={color} />
+            <TabIcon focused={focused} icon="🏠" label={t('Home', 'Inicio')} color={color} />
           ),
         }}
       />
@@ -63,7 +72,7 @@ export const MainTabs: React.FC = () => {
         component={JourneyHubScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon focused={focused} icon="🗺️" label="Journey" color={color} />
+            <TabIcon focused={focused} icon="🗺️" label={t('Journey', 'Viaje')} color={color} />
           ),
         }}
       />
@@ -90,7 +99,7 @@ export const MainTabs: React.FC = () => {
         component={ShopScreen}
         options={{
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon focused={focused} icon="🛒" label="Shop" color={color} />
+            <TabIcon focused={focused} icon="🛒" label={t('Shop', 'Tienda')} color={color} />
           ),
         }}
       />

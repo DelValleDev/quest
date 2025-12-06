@@ -21,10 +21,13 @@ import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import questAI from '../../lib/openai';
+import { FREE_LIMITS, LimitsService } from '../../lib/limits';
 
 type RootStackParamList = {
   LifePaths: undefined;
   LifePathDetail: { pathId: string };
+  Premium: undefined;
 };
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -90,16 +93,32 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
   const [weeklyObjectives, setWeeklyObjectives] = useState<WeeklyObjective[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedPath, setSelectedPath] = useState<LifePath | null>(null);
+  const [activePillars, setActivePillars] = useState<string[]>([]);
 
   // New path form
   const [newPathTitle, setNewPathTitle] = useState('');
   const [newPathVision, setNewPathVision] = useState('');
   const [newPathPillar, setNewPathPillar] = useState<string>('');
+  const [newPathTimeframe, setNewPathTimeframe] = useState<number>(6); // months
+  const [isPremium, setIsPremium] = useState(false);
+  const [extraLifePathSlots, setExtraLifePathSlots] = useState(0);
 
   const fetchData = async () => {
     if (!user?.id) return;
 
     try {
+      // Fetch active pillars first
+      const { data: pillarsData } = await supabase
+        .from('user_pillars')
+        .select('pillar_id, is_active')
+        .eq('user_id', user.id);
+      
+      // Filter to only active pillars (default to true for backwards compat)
+      const active = (pillarsData || [])
+        .filter(p => p.is_active !== false)
+        .map(p => p.pillar_id);
+      setActivePillars(active.length > 0 ? active : Object.keys(PILLAR_CONFIG));
+
       // Fetch life paths
       const { data: paths, error: pathsError } = await supabase
         .from('life_paths')
@@ -133,6 +152,18 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
 
       setWeeklyObjectives(objectives || []);
 
+      // Check premium status and purchased slots
+      const features = await LimitsService.getPurchasedFeatures(user.id);
+      setExtraLifePathSlots(features.extraLifePaths);
+      
+      // Check if premium
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .single();
+      setIsPremium(profile?.subscription_tier === 'premium' || profile?.subscription_tier === 'yearly');
+
     } catch (err) {
       console.error('Error fetching life paths:', err);
     } finally {
@@ -160,8 +191,31 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
       return;
     }
 
+    // Check life path limit for free users
+    const maxLifePaths = isPremium ? Infinity : FREE_LIMITS.LIFE_PATHS + extraLifePathSlots;
+    if (!isPremium && lifePaths.length >= maxLifePaths) {
+      Alert.alert(
+        t('Life Path Limit Reached', 'Límite de Life Paths Alcanzado'),
+        t(
+          `Free users can have up to ${maxLifePaths} active life paths. Upgrade to Premium for unlimited life paths!`,
+          `Los usuarios gratuitos pueden tener hasta ${maxLifePaths} life paths activos. ¡Mejora a Premium para life paths ilimitados!`
+        ),
+        [
+          { text: t('Cancel', 'Cancelar'), style: 'cancel' },
+          { 
+            text: t('Upgrade', 'Mejorar'), 
+            onPress: () => navigation.navigate('Premium')
+          },
+        ]
+      );
+      return;
+    }
+
     try {
-      const { error } = await supabase
+      setLoading(true);
+      
+      // Create the Life Path
+      const { data: pathData, error } = await supabase
         .from('life_paths')
         .insert({
           user_id: user?.id,
@@ -171,23 +225,55 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
           icon: PILLAR_CONFIG[newPathPillar]?.emoji || '🎯',
           color: PILLAR_CONFIG[newPathPillar]?.color || '#8B5CF6',
           target_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
       setShowCreateModal(false);
+      const pathTitle = newPathTitle.trim();
+      const pathVision = newPathVision.trim() || null;
+      const pathPillar = newPathPillar;
+      const timeframeMonths = newPathTimeframe;
       setNewPathTitle('');
       setNewPathVision('');
       setNewPathPillar('');
-      fetchData();
-
+      setNewPathTimeframe(6);
+      
+      // Generate milestones, habits, and quests with AI
       Alert.alert(
         t('Path Created! 🎯', '¡Camino Creado! 🎯'),
-        t('Your life path has been created. Now let\'s add milestones!', 'Tu camino de vida ha sido creado. ¡Ahora agreguemos hitos!')
+        t('Generating your personalized action plan...', 'Generando tu plan de acción personalizado...'),
       );
+
+      if (pathData?.id && user?.id) {
+        const result = await questAI.expandLifePath(
+          user.id,
+          pathData.id,
+          pathTitle,
+          pathVision,
+          pathPillar,
+          timeframeMonths
+        );
+        
+        if (result.success) {
+          Alert.alert(
+            t('Action Plan Ready! 🚀', '¡Plan de Acción Listo! 🚀'),
+            t(
+              'Your milestones, habits, and quests have been created. Start your journey!',
+              '¡Tus hitos, hábitos y quests han sido creados. ¡Comienza tu viaje!'
+            )
+          );
+        }
+      }
+
+      fetchData();
     } catch (err) {
       console.error('Error creating path:', err);
       Alert.alert(t('Error', 'Error'), t('Failed to create path', 'Error al crear el camino'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -228,6 +314,11 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
     header: {
       marginBottom: 24,
     },
+    headerTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    },
     headerTitle: {
       fontSize: 28,
       fontWeight: '800',
@@ -237,6 +328,39 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
     headerSubtitle: {
       fontSize: 15,
       color: theme.textSecondary,
+    },
+    usageCounterBadge: {
+      backgroundColor: theme.surface,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: theme.border,
+      minWidth: 70,
+    },
+    usageCounterText: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: theme.text,
+    },
+    usageCounterLabel: {
+      fontSize: 11,
+      color: theme.textSecondary,
+      marginTop: 2,
+    },
+    premiumBadge: {
+      backgroundColor: '#8B5CF6',
+      borderColor: '#A78BFA',
+    },
+    premiumBadgeText: {
+      fontSize: 18,
+    },
+    premiumBadgeLabel: {
+      fontSize: 11,
+      color: '#FFFFFF',
+      fontWeight: '600',
+      marginTop: 2,
     },
     section: {
       marginBottom: 24,
@@ -479,6 +603,33 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
       fontSize: 14,
       color: theme.text,
     },
+    timeframeSelector: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 8,
+    },
+    timeframeOption: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: theme.surface,
+      borderWidth: 2,
+      borderColor: theme.border,
+    },
+    timeframeOptionSelected: {
+      borderColor: theme.primary,
+      backgroundColor: theme.primary + '15',
+    },
+    timeframeOptionText: {
+      fontSize: 13,
+      color: theme.textSecondary,
+      fontWeight: '600',
+    },
+    timeframeOptionTextSelected: {
+      color: theme.primary,
+      fontWeight: '700',
+    },
     modalButtons: {
       flexDirection: 'row',
       gap: 12,
@@ -531,12 +682,35 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {t('Life Paths', 'Caminos de Vida')} 🎯
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            {t('Your journey to becoming your best self', 'Tu viaje para ser tu mejor versión')}
-          </Text>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.headerTitle}>
+                {t('Life Paths', 'Caminos de Vida')} 🎯
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                {t('Your journey to becoming your best self', 'Tu viaje para ser tu mejor versión')}
+              </Text>
+            </View>
+            {/* Usage Counter Badge */}
+            {!isPremium && (
+              <View style={styles.usageCounterBadge}>
+                <Text style={styles.usageCounterText}>
+                  {lifePaths.length}/{FREE_LIMITS.LIFE_PATHS + extraLifePathSlots}
+                </Text>
+                <Text style={styles.usageCounterLabel}>
+                  {t('paths', 'caminos')}
+                </Text>
+              </View>
+            )}
+            {isPremium && (
+              <View style={[styles.usageCounterBadge, styles.premiumBadge]}>
+                <Text style={styles.premiumBadgeText}>✨</Text>
+                <Text style={styles.premiumBadgeLabel}>
+                  {t('Unlimited', 'Ilimitado')}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Life Paths */}
@@ -703,9 +877,40 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
               multiline
             />
 
-            <Text style={styles.inputLabel}>{t('Life area', 'Área de vida')}</Text>
+            <Text style={styles.inputLabel}>{t('Time to achieve', 'Tiempo para lograrlo')}</Text>
+            <View style={styles.timeframeSelector}>
+              {[1, 3, 6, 9, 12, 18, 24].map((months) => (
+                <TouchableOpacity
+                  key={months}
+                  style={[
+                    styles.timeframeOption,
+                    newPathTimeframe === months && styles.timeframeOptionSelected,
+                  ]}
+                  onPress={() => setNewPathTimeframe(months)}
+                >
+                  <Text style={[
+                    styles.timeframeOptionText,
+                    newPathTimeframe === months && styles.timeframeOptionTextSelected,
+                  ]}>
+                    {months === 1 ? t('1 month', '1 mes') : 
+                     months < 12 ? `${months} ${t('months', 'meses')}` : 
+                     months === 12 ? t('1 year', '1 año') : 
+                     `${months / 12} ${t('years', 'años')}`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 16 }}>
+              💡 {newPathTimeframe < 6 
+                ? t('Shorter time = Higher intensity', 'Menos tiempo = Mayor intensidad')
+                : t('More time = Sustainable pace', 'Más tiempo = Ritmo sostenible')}
+            </Text>
+
+            <Text style={styles.inputLabel}>{t('Life area', 'Área de vida')} ({t('your active pillars', 'tus pilares activos')})</Text>
             <View style={styles.pillarSelector}>
-              {Object.entries(PILLAR_CONFIG).map(([key, config]) => (
+              {Object.entries(PILLAR_CONFIG)
+                .filter(([key]) => activePillars.includes(key))
+                .map(([key, config]) => (
                 <TouchableOpacity
                   key={key}
                   style={[
@@ -721,6 +926,11 @@ export const LifePathsScreen: React.FC<LifePathsScreenProps> = ({ embedded = fal
                 </TouchableOpacity>
               ))}
             </View>
+            {activePillars.length < 6 && (
+              <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: -10, marginBottom: 16 }}>
+                💡 {t('Want more areas? Activate pillars in your profile.', '¿Quieres más áreas? Activa pilares en tu perfil.')}
+              </Text>
+            )}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity 

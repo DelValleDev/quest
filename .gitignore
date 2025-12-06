@@ -71,6 +71,7 @@ supabase/.temp
 quest-doc.md
 docs/REVENUCAT_SETUP.md
 .private/
+private/
 
 # Misc
 *.pem

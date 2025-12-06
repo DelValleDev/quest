@@ -270,6 +270,17 @@ export const SocialHubScreen: React.FC = () => {
       fontWeight: '600',
       color: theme.warning,
     },
+    comingSoonTitle: {
+      fontSize: 24,
+      fontWeight: '700',
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    comingSoonSubtitle: {
+      fontSize: 16,
+      textAlign: 'center',
+      paddingHorizontal: 40,
+    },
     // Leaderboard styles
     leaderboardItem: {
       flexDirection: 'row',
@@ -347,55 +358,32 @@ export const SocialHubScreen: React.FC = () => {
     switch (activeTab) {
       case 'feed':
         return (
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.scrollContent}>
-              {feedItems.map((item) => (
-                <View key={item.id} style={styles.feedItem}>
-                  <View style={styles.feedAvatar}>
-                    <Text style={styles.feedAvatarText}>{item.avatar}</Text>
-                  </View>
-                  <View style={styles.feedContent}>
-                    <Text style={styles.feedUser}>{item.user}</Text>
-                    <Text style={styles.feedAction}>{item.action}</Text>
-                    <Text style={styles.feedTime}>{item.time}</Text>
-                  </View>
-                  <Text style={styles.feedIcon}>{item.icon}</Text>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
+          <View style={[styles.content, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ fontSize: 64, marginBottom: 16 }}>🚧</Text>
+            <Text style={[styles.comingSoonTitle, { color: theme.text }]}>
+              {t('Coming Soon', 'Próximamente')}
+            </Text>
+            <Text style={[styles.comingSoonSubtitle, { color: theme.textSecondary }]}>
+              {t('Activity feed is under construction', 'El feed de actividad está en construcción')}
+            </Text>
+          </View>
         );
 
       case 'friends':
         return (
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            <View style={styles.scrollContent}>
-              {friends.map((friend) => (
-                <View key={friend.id} style={styles.friendCard}>
-                  <View style={styles.friendAvatar}>
-                    <Text style={styles.friendAvatarText}>{friend.avatar}</Text>
-                    <View style={[styles.onlineIndicator, !friend.online && styles.offlineIndicator]} />
-                  </View>
-                  <View style={styles.friendInfo}>
-                    <Text style={styles.friendName}>{friend.name}</Text>
-                    <View style={styles.friendStats}>
-                      <Text style={styles.friendStat}>⭐ Lv {friend.level}</Text>
-                      <Text style={styles.friendStat}>🔥 {friend.streak} {t('days', 'días')}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.friendActions}>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <Text style={styles.actionButtonText}>⚔️</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
+          <View style={[styles.content, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ fontSize: 64, marginBottom: 16 }}>👥</Text>
+            <Text style={[styles.comingSoonTitle, { color: theme.text }]}>
+              {t('Coming Soon', 'Próximamente')}
+            </Text>
+            <Text style={[styles.comingSoonSubtitle, { color: theme.textSecondary }]}>
+              {t('Friends feature is coming soon!', '¡La función de amigos viene pronto!')}
+            </Text>
+          </View>
         );
 
       case 'guilds':
-        return <GuildsScreen embedded />;
+        return <GuildsScreen embedded navigation={navigation} />;
 
       case 'leaderboard':
         return <LeaderboardScreen embedded />;

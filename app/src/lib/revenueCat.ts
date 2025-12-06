@@ -24,7 +24,7 @@ import {
   SUBSCRIPTION_PRODUCTS,
   QUEST_COINS_PRODUCTS,
   type PurchaseResult,
-} from "./payments";
+} from "./paymentTypes";
 
 // =====================================================
 // CONFIGURATION

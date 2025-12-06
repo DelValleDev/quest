@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore, useAuthStore } from '../../store';
+import { useThemeStore, useAuthStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import type { RootStackParamList } from '../../../App';
@@ -77,16 +77,28 @@ interface Guild {
 // =====================================================
 // TABS
 // =====================================================
-const SOCIAL_TABS = [
+const SOCIAL_TABS_EN = [
   { id: 'friends', label: 'Friends', icon: '👥' },
   { id: 'leaderboard', label: 'Rankings', icon: '🏆' },
   { id: 'guilds', label: 'Guilds', icon: '⚔️' },
 ];
 
-const LEADERBOARD_FILTERS = [
+const SOCIAL_TABS_ES = [
+  { id: 'friends', label: 'Amigos', icon: '👥' },
+  { id: 'leaderboard', label: 'Rankings', icon: '🏆' },
+  { id: 'guilds', label: 'Gremios', icon: '⚔️' },
+];
+
+const LEADERBOARD_FILTERS_EN = [
   { id: 'xp', label: 'XP', icon: '⭐' },
   { id: 'streak', label: 'Streak', icon: '🔥' },
   { id: 'challenges', label: 'Challenges', icon: '🎯' },
+];
+
+const LEADERBOARD_FILTERS_ES = [
+  { id: 'xp', label: 'XP', icon: '⭐' },
+  { id: 'streak', label: 'Racha', icon: '🔥' },
+  { id: 'challenges', label: 'Desafíos', icon: '🎯' },
 ];
 
 // =====================================================
@@ -95,8 +107,12 @@ const LEADERBOARD_FILTERS = [
 export const SocialScreen: React.FC = () => {
   const { mode } = useThemeStore();
   const { user } = useAuthStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   // Tab state
   const [activeTab, setActiveTab] = useState('friends');
@@ -323,15 +339,15 @@ export const SocialScreen: React.FC = () => {
       if (error) throw error;
 
       if (data?.success) {
-        Alert.alert('Success', data.message);
+        Alert.alert(t('Success', 'Éxito'), data.message);
         setSearchResults([]);
         setSearchQuery('');
         fetchFriends();
       } else {
-        Alert.alert('Error', data?.error || 'Failed to send request');
+        Alert.alert(t('Error', 'Error'), data?.error || t('Failed to send request', 'Error al enviar solicitud'));
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('Error', 'Error'), err.message);
     }
   };
 
@@ -347,13 +363,13 @@ export const SocialScreen: React.FC = () => {
       if (error) throw error;
 
       if (data?.success) {
-        Alert.alert('Success', 'Friend request accepted!');
+        Alert.alert(t('Success', 'Éxito'), t('Friend request accepted!', '¡Solicitud de amistad aceptada!'));
         fetchFriends();
       } else {
-        Alert.alert('Error', data?.error || 'Failed to accept');
+        Alert.alert(t('Error', 'Error'), data?.error || t('Failed to accept', 'Error al aceptar'));
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('Error', 'Error'), err.message);
     }
   };
 
@@ -372,7 +388,7 @@ export const SocialScreen: React.FC = () => {
         fetchFriends();
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('Error', 'Error'), err.message);
     }
   };
 
@@ -380,12 +396,12 @@ export const SocialScreen: React.FC = () => {
     if (!user) return;
 
     Alert.alert(
-      'Remove Friend',
-      `Are you sure you want to remove ${friendName} from your friends?`,
+      t('Remove Friend', 'Eliminar Amigo'),
+      t(`Are you sure you want to remove ${friendName} from your friends?`, `¿Estás seguro de que quieres eliminar a ${friendName} de tus amigos?`),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('Cancel', 'Cancelar'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('Remove', 'Eliminar'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -398,7 +414,7 @@ export const SocialScreen: React.FC = () => {
                 fetchFriends();
               }
             } catch (err: any) {
-              Alert.alert('Error', err.message);
+              Alert.alert(t('Error', 'Error'), err.message);
             }
           },
         },
@@ -410,7 +426,7 @@ export const SocialScreen: React.FC = () => {
     if (!user) return;
 
     if (!newGuildName.trim()) {
-      Alert.alert('Error', 'Please enter a guild name');
+      Alert.alert(t('Error', 'Error'), t('Please enter a guild name', 'Por favor ingresa un nombre para el gremio'));
       return;
     }
 
@@ -426,16 +442,16 @@ export const SocialScreen: React.FC = () => {
       if (error) throw error;
 
       if (data?.success) {
-        Alert.alert('Success', 'Guild created!');
+        Alert.alert(t('Success', 'Éxito'), t('Guild created!', '¡Gremio creado!'));
         setShowCreateGuildModal(false);
         setNewGuildName('');
         setNewGuildDesc('');
         fetchGuilds();
       } else {
-        Alert.alert('Error', data?.error || 'Failed to create guild');
+        Alert.alert(t('Error', 'Error'), data?.error || t('Failed to create guild', 'Error al crear gremio'));
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('Error', 'Error'), err.message);
     }
   };
 
@@ -451,23 +467,23 @@ export const SocialScreen: React.FC = () => {
       if (error) throw error;
 
       if (data?.success) {
-        Alert.alert('Success', 'Joined guild!');
+        Alert.alert(t('Success', 'Éxito'), t('Joined guild!', '¡Te uniste al gremio!'));
         fetchGuilds();
       } else {
-        Alert.alert('Error', data?.error || 'Failed to join');
+        Alert.alert(t('Error', 'Error'), data?.error || t('Failed to join', 'Error al unirse'));
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(t('Error', 'Error'), err.message);
     }
   };
 
   const leaveGuild = async () => {
     if (!user) return;
 
-    Alert.alert('Leave Guild', 'Are you sure you want to leave this guild?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('Leave Guild', 'Abandonar Gremio'), t('Are you sure you want to leave this guild?', '¿Estás seguro de que quieres abandonar este gremio?'), [
+      { text: t('Cancel', 'Cancelar'), style: 'cancel' },
       {
-        text: 'Leave',
+        text: t('Leave', 'Abandonar'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -476,11 +492,11 @@ export const SocialScreen: React.FC = () => {
             });
 
             if (!error && data?.success) {
-              Alert.alert('Success', data.message);
+              Alert.alert(t('Success', 'Éxito'), data.message);
               fetchGuilds();
             }
           } catch (err: any) {
-            Alert.alert('Error', err.message);
+            Alert.alert(t('Error', 'Error'), err.message);
           }
         },
       },
@@ -1050,7 +1066,7 @@ export const SocialScreen: React.FC = () => {
 
   const getStatValue = (entry: LeaderboardEntry): string => {
     if (leaderboardFilter === 'xp') return `${entry.total_xp.toLocaleString()} XP`;
-    if (leaderboardFilter === 'streak') return `🔥 ${entry.current_streak} days`;
+    if (leaderboardFilter === 'streak') return `🔥 ${entry.current_streak} ${t('days', 'días')}`;
     return `🎯 ${entry.challenges_completed}`;
   };
 
@@ -1069,7 +1085,7 @@ export const SocialScreen: React.FC = () => {
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="🔍 Search users by username..."
+          placeholder={t('🔍 Search users by username...', '🔍 Buscar usuarios por nombre...')}
           placeholderTextColor={theme.textSecondary}
           value={searchQuery}
           onChangeText={(text) => {
@@ -1095,7 +1111,7 @@ export const SocialScreen: React.FC = () => {
                   style={styles.joinBtn}
                   onPress={() => sendFriendRequest(user.id)}
                 >
-                  <Text style={styles.joinBtnText}>Add</Text>
+                  <Text style={styles.joinBtnText}>{t('Add', 'Agregar')}</Text>
                 </TouchableOpacity>
               </View>
             ))}
@@ -1110,7 +1126,7 @@ export const SocialScreen: React.FC = () => {
           onPress={() => setShowRequestsModal(true)}
         >
           <Text style={styles.requestsBtnText}>
-            📬 {friendRequests.length} Friend Request{friendRequests.length > 1 ? 's' : ''}
+            📬 {friendRequests.length} {t(`Friend Request${friendRequests.length > 1 ? 's' : ''}`, `Solicitud${friendRequests.length > 1 ? 'es' : ''} de amistad`)}
           </Text>
         </TouchableOpacity>
       )}
@@ -1118,7 +1134,7 @@ export const SocialScreen: React.FC = () => {
       {/* Friends List */}
       {friends.length === 0 ? (
         <Text style={styles.emptyText}>
-          No friends yet.{'\n'}Search for users to add friends!
+          {t('No friends yet.', 'Aún no tienes amigos.')}{'\n'}{t('Search for users to add friends!', '¡Busca usuarios para agregar amigos!')}
         </Text>
       ) : (
         friends.map((friend) => (
@@ -1176,7 +1192,7 @@ export const SocialScreen: React.FC = () => {
       {/* User Rank */}
       {userRank && (
         <View style={styles.userRankCard}>
-          <Text style={styles.userRankTitle}>YOUR RANK</Text>
+          <Text style={styles.userRankTitle}>{t('YOUR RANK', 'TU POSICIÓN')}</Text>
           <View style={styles.userRankRow}>
             <Text style={styles.userRankBig}>
               {getRankEmoji(getRank(userRank))}
@@ -1227,7 +1243,7 @@ export const SocialScreen: React.FC = () => {
             <View style={styles.myGuildInfo}>
               <Text style={styles.myGuildName}>{myGuild.name}</Text>
               <Text style={styles.myGuildMembers}>
-                {myGuild.member_count}/{myGuild.max_members} members
+                {myGuild.member_count}/{myGuild.max_members} {t('members', 'miembros')}
               </Text>
             </View>
           </View>
@@ -1239,11 +1255,11 @@ export const SocialScreen: React.FC = () => {
               <Text style={styles.myGuildStatValue}>
                 {myGuild.total_xp.toLocaleString()}
               </Text>
-              <Text style={styles.myGuildStatLabel}>Total XP</Text>
+              <Text style={styles.myGuildStatLabel}>{t('Total XP', 'XP Total')}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.leaveGuildBtn} onPress={leaveGuild}>
-            <Text style={styles.leaveGuildText}>Leave Guild</Text>
+            <Text style={styles.leaveGuildText}>{t('Leave Guild', 'Abandonar Gremio')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -1252,17 +1268,17 @@ export const SocialScreen: React.FC = () => {
           onPress={() => setShowCreateGuildModal(true)}
         >
           <Text style={{ fontSize: 20 }}>⚔️</Text>
-          <Text style={styles.createGuildText}>Create Your Own Guild</Text>
+          <Text style={styles.createGuildText}>{t('Create Your Own Guild', 'Crea Tu Propio Gremio')}</Text>
         </TouchableOpacity>
       )}
 
       {/* Public Guilds */}
       <Text style={styles.sectionTitle}>
-        {myGuild ? 'Other Guilds' : 'Join a Guild'}
+        {myGuild ? t('Other Guilds', 'Otros Gremios') : t('Join a Guild', 'Únete a un Gremio')}
       </Text>
 
       {guilds.filter((g) => g.id !== myGuild?.id).length === 0 ? (
-        <Text style={styles.emptyText}>No public guilds available</Text>
+        <Text style={styles.emptyText}>{t('No public guilds available', 'No hay gremios públicos disponibles')}</Text>
       ) : (
         guilds
           .filter((g) => g.id !== myGuild?.id)
@@ -1298,7 +1314,7 @@ export const SocialScreen: React.FC = () => {
                     style={styles.joinBtn}
                     onPress={() => joinGuild(guild.id)}
                   >
-                    <Text style={styles.joinBtnText}>Join</Text>
+                    <Text style={styles.joinBtnText}>{t('Join', 'Unirse')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -1323,11 +1339,14 @@ export const SocialScreen: React.FC = () => {
 
   const GUILD_ICONS = ['⚔️', '🛡️', '🏰', '🐉', '🦁', '🔥', '💎', '⭐', '🌟', '🚀', '🎯', '👑'];
 
+  const SOCIAL_TABS = language === 'es' ? SOCIAL_TABS_ES : SOCIAL_TABS_EN;
+  const LEADERBOARD_FILTERS = language === 'es' ? LEADERBOARD_FILTERS_ES : LEADERBOARD_FILTERS_EN;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Social</Text>
+        <Text style={styles.title}>{t('Social', 'Social')}</Text>
         <View style={styles.tabsContainer}>
           {SOCIAL_TABS.map((tab) => (
             <TouchableOpacity
@@ -1357,10 +1376,10 @@ export const SocialScreen: React.FC = () => {
         <Text style={styles.raidsBannerIcon}>⚔️</Text>
         <View style={styles.raidsBannerContent}>
           <Text style={[styles.raidsBannerTitle, { color: theme.text }]}>
-            Group Raids
+            {t('Group Raids', 'Raids Grupales')}
           </Text>
           <Text style={[styles.raidsBannerSubtitle, { color: theme.textSecondary }]}>
-            Challenge your friends together!
+            {t('Challenge your friends together!', '¡Desafía a tus amigos juntos!')}
           </Text>
         </View>
         <Text style={[styles.raidsBannerArrow, { color: theme.textSecondary }]}>›</Text>
@@ -1374,10 +1393,10 @@ export const SocialScreen: React.FC = () => {
         <Text style={styles.raidsBannerIcon}>🏆</Text>
         <View style={styles.raidsBannerContent}>
           <Text style={[styles.raidsBannerTitle, { color: theme.text }]}>
-            Global Leaderboard
+            {t('Global Leaderboard', 'Clasificación Global')}
           </Text>
           <Text style={[styles.raidsBannerSubtitle, { color: theme.textSecondary }]}>
-            See where you rank!
+            {t('See where you rank!', '¡Mira tu posición!')}
           </Text>
         </View>
         <Text style={[styles.raidsBannerArrow, { color: theme.textSecondary }]}>›</Text>
@@ -1406,7 +1425,7 @@ export const SocialScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Friend Requests</Text>
+            <Text style={styles.modalTitle}>{t('Friend Requests', 'Solicitudes de Amistad')}</Text>
             <ScrollView>
               {friendRequests.map((request) => (
                 <View key={request.id} style={styles.requestItem}>
@@ -1451,7 +1470,7 @@ export const SocialScreen: React.FC = () => {
               style={[styles.modalBtn, styles.cancelBtn, { marginTop: 15 }]}
               onPress={() => setShowRequestsModal(false)}
             >
-              <Text style={[styles.modalBtnText, styles.cancelBtnText]}>Close</Text>
+              <Text style={[styles.modalBtnText, styles.cancelBtnText]}>{t('Close', 'Cerrar')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1466,9 +1485,9 @@ export const SocialScreen: React.FC = () => {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Create Guild</Text>
+            <Text style={styles.modalTitle}>{t('Create Guild', 'Crear Gremio')}</Text>
             
-            <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>Choose Icon</Text>
+            <Text style={[styles.sectionTitle, { marginBottom: 10 }]}>{t('Choose Icon', 'Elegir Icono')}</Text>
             <View style={styles.emojiRow}>
               {GUILD_ICONS.map((icon) => (
                 <TouchableOpacity
@@ -1486,7 +1505,7 @@ export const SocialScreen: React.FC = () => {
 
             <TextInput
               style={styles.modalInput}
-              placeholder="Guild Name"
+              placeholder={t('Guild Name', 'Nombre del Gremio')}
               placeholderTextColor={theme.textSecondary}
               value={newGuildName}
               onChangeText={setNewGuildName}
@@ -1494,7 +1513,7 @@ export const SocialScreen: React.FC = () => {
             />
             <TextInput
               style={[styles.modalInput, { height: 80 }]}
-              placeholder="Description (optional)"
+              placeholder={t('Description (optional)', 'Descripción (opcional)')}
               placeholderTextColor={theme.textSecondary}
               value={newGuildDesc}
               onChangeText={setNewGuildDesc}
@@ -1507,13 +1526,13 @@ export const SocialScreen: React.FC = () => {
                 style={[styles.modalBtn, styles.cancelBtn]}
                 onPress={() => setShowCreateGuildModal(false)}
               >
-                <Text style={[styles.modalBtnText, styles.cancelBtnText]}>Cancel</Text>
+                <Text style={[styles.modalBtnText, styles.cancelBtnText]}>{t('Cancel', 'Cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalBtn, styles.confirmBtn]}
                 onPress={createGuild}
               >
-                <Text style={[styles.modalBtnText, styles.confirmBtnText]}>Create</Text>
+                <Text style={[styles.modalBtnText, styles.confirmBtnText]}>{t('Create', 'Crear')}</Text>
               </TouchableOpacity>
             </View>
           </View>

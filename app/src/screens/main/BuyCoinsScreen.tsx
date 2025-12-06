@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useThemeStore, useAuthStore } from "../../store";
+import { useThemeStore, useAuthStore, useLanguageStore } from "../../store";
 import { getTheme } from "../../theme/colors";
 import {
   Payments,
@@ -29,7 +29,11 @@ export const BuyCoinsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { mode } = useThemeStore();
   const { user } = useAuthStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const [currentBalance, setCurrentBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -70,15 +74,15 @@ export const BuyCoinsScreen: React.FC = () => {
         const totalCoins = product.amount + product.bonus;
 
         Alert.alert(
-          "🎉 ¡Compra exitosa!",
-          `Has recibido ${totalCoins.toLocaleString()} Quest Coins`,
-          [{ text: "¡Genial!", onPress: loadBalance }]
+          t('🎉 Purchase successful!', '🎉 ¡Compra exitosa!'),
+          t(`You received ${totalCoins.toLocaleString()} Quest Coins`, `Has recibido ${totalCoins.toLocaleString()} Quest Coins`),
+          [{ text: t('Awesome!', '¡Genial!'), onPress: loadBalance }]
         );
       } else {
-        Alert.alert("Error", result.error || "No se pudo completar la compra");
+        Alert.alert(t('Error', 'Error'), result.error || t('Could not complete purchase', 'No se pudo completar la compra'));
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Error al procesar la compra");
+      Alert.alert(t('Error', 'Error'), error.message || t('Error processing purchase', 'Error al procesar la compra'));
     } finally {
       setPurchasing(false);
       setSelectedProduct(null);
@@ -115,12 +119,12 @@ export const BuyCoinsScreen: React.FC = () => {
         {/* Badge */}
         {product.popular && (
           <View style={[styles.badge, { backgroundColor: "#F59E0B" }]}>
-            <Text style={styles.badgeText}>⭐ POPULAR</Text>
+            <Text style={styles.badgeText}>⭐ {t('POPULAR', 'POPULAR')}</Text>
           </View>
         )}
         {product.bestValue && (
           <View style={[styles.badge, { backgroundColor: "#22C55E" }]}>
-            <Text style={styles.badgeText}>💎 MEJOR VALOR</Text>
+            <Text style={styles.badgeText}>💎 {t('BEST VALUE', 'MEJOR VALOR')}</Text>
           </View>
         )}
 
@@ -177,11 +181,11 @@ export const BuyCoinsScreen: React.FC = () => {
           style={styles.backButton}
         >
           <Text style={[styles.backText, { color: theme.primary }]}>
-            ← Volver
+            ← {t('Back', 'Volver')}
           </Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.text }]}>
-          Comprar Quest Coins
+          {t('Buy Quest Coins', 'Comprar Quest Coins')}
         </Text>
       </View>
 
@@ -190,7 +194,7 @@ export const BuyCoinsScreen: React.FC = () => {
         style={[styles.balanceCard, { backgroundColor: theme.primary + "20" }]}
       >
         <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}>
-          Tu balance actual
+          {t('Your current balance', 'Tu balance actual')}
         </Text>
         <View style={styles.balanceRow}>
           <Text style={styles.balanceIcon}>🪙</Text>
@@ -207,7 +211,7 @@ export const BuyCoinsScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Elige un paquete
+          {t('Choose a package', 'Elige un paquete')}
         </Text>
 
         <View style={styles.packagesGrid}>
@@ -219,19 +223,19 @@ export const BuyCoinsScreen: React.FC = () => {
         {/* Info */}
         <View style={styles.infoSection}>
           <Text style={[styles.infoText, { color: theme.textMuted }]}>
-            💡 Los Quest Coins se pueden usar para:
+            💡 {t('Quest Coins can be used for:', 'Los Quest Coins se pueden usar para:')}
           </Text>
           <Text style={[styles.infoItem, { color: theme.textSecondary }]}>
-            • Comprar avatares y temas exclusivos
+            • {t('Buy exclusive avatars and themes', 'Comprar avatares y temas exclusivos')}
           </Text>
           <Text style={[styles.infoItem, { color: theme.textSecondary }]}>
-            • Desbloquear boosters de XP
+            • {t('Unlock XP boosters', 'Desbloquear boosters de XP')}
           </Text>
           <Text style={[styles.infoItem, { color: theme.textSecondary }]}>
-            • Apostar en duelos con amigos
+            • {t('Bet on duels with friends', 'Apostar en duelos con amigos')}
           </Text>
           <Text style={[styles.infoItem, { color: theme.textSecondary }]}>
-            • Personalizar tu Quest mascota
+            • {t('Customize your Quest mascot', 'Personalizar tu Quest mascota')}
           </Text>
         </View>
       </ScrollView>
@@ -251,7 +255,7 @@ export const BuyCoinsScreen: React.FC = () => {
                   {QUEST_COINS_PRODUCTS[selectedProduct].icon}
                 </Text>
                 <Text style={[styles.modalTitle, { color: theme.text }]}>
-                  Confirmar compra
+                  {t('Confirm purchase', 'Confirmar compra')}
                 </Text>
                 <Text style={[styles.modalAmount, { color: theme.primary }]}>
                   {(
@@ -270,7 +274,7 @@ export const BuyCoinsScreen: React.FC = () => {
                     onPress={() => setShowConfirmModal(false)}
                   >
                     <Text style={[styles.modalButtonText, { color: theme.text }]}>
-                      Cancelar
+                      {t('Cancel', 'Cancelar')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -282,7 +286,7 @@ export const BuyCoinsScreen: React.FC = () => {
                       <ActivityIndicator color="#FFF" size="small" />
                     ) : (
                       <Text style={[styles.modalButtonText, { color: "#FFF" }]}>
-                        Comprar
+                        {t('Buy', 'Comprar')}
                       </Text>
                     )}
                   </TouchableOpacity>

@@ -3,8 +3,9 @@
 -- Description: Table for logging free-form activities that earn XP
 -- =====================================================
 
+-- Use gen_random_uuid() instead of uuid_generate_v4()
 CREATE TABLE IF NOT EXISTS public.achievement_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   description TEXT NOT NULL,
   pillar TEXT NOT NULL DEFAULT 'general',

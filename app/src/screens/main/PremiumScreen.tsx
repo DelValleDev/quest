@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { 
@@ -62,8 +62,12 @@ const FeatureRow: React.FC<FeatureRowProps> = ({
 
 export const PremiumScreen: React.FC = () => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation();
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const [status, setStatus] = useState<PremiumStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,16 +126,16 @@ export const PremiumScreen: React.FC = () => {
       
       if (result.success) {
         Alert.alert(
-          '🎉 ¡Premium Activado!',
-          'Tienes 1 mes gratis de todas las funciones premium. ¡Disfrútalo!',
-          [{ text: 'Genial', onPress: () => navigation.goBack() }]
+          t('🎉 Premium Activated!', '🎉 ¡Premium Activado!'),
+          t('You have 1 month free of all premium features. Enjoy!', 'Tienes 1 mes gratis de todas las funciones premium. ¡Disfrútalo!'),
+          [{ text: t('Great', 'Genial'), onPress: () => navigation.goBack() }]
         );
         loadStatus();
       } else {
-        Alert.alert('Aviso', result.message);
+        Alert.alert(t('Notice', 'Aviso'), result.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudo activar la prueba');
+      Alert.alert(t('Error', 'Error'), t('Could not activate trial', 'No se pudo activar la prueba'));
     } finally {
       setPurchasing(false);
     }
@@ -142,7 +146,7 @@ export const PremiumScreen: React.FC = () => {
     try {
       const pkg = packages.find(p => p.id === packageId);
       if (!pkg) {
-        Alert.alert('Error', 'Paquete no encontrado');
+        Alert.alert(t('Error', 'Error'), t('Package not found', 'Paquete no encontrado'));
         return;
       }
 
@@ -150,16 +154,16 @@ export const PremiumScreen: React.FC = () => {
       
       if (result.success) {
         Alert.alert(
-          '🎉 ¡Compra Exitosa!',
-          'Tu suscripción Premium está activa. ¡Disfruta todas las funciones!',
-          [{ text: 'Genial', onPress: () => navigation.goBack() }]
+          t('🎉 Purchase Successful!', '🎉 ¡Compra Exitosa!'),
+          t('Your Premium subscription is active. Enjoy all the features!', 'Tu suscripción Premium está activa. ¡Disfruta todas las funciones!'),
+          [{ text: t('Great', 'Genial'), onPress: () => navigation.goBack() }]
         );
         loadStatus();
       } else if (!result.cancelled) {
-        Alert.alert('Error', result.error || 'No se pudo completar la compra');
+        Alert.alert(t('Error', 'Error'), result.error || t('Could not complete purchase', 'No se pudo completar la compra'));
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Error procesando la compra');
+      Alert.alert(t('Error', 'Error'), error.message || t('Error processing purchase', 'Error procesando la compra'));
     } finally {
       setPurchasing(false);
     }
@@ -172,18 +176,18 @@ export const PremiumScreen: React.FC = () => {
       
       if (result.restored) {
         Alert.alert(
-          '✅ Compras Restauradas',
-          'Tu suscripción ha sido restaurada exitosamente.',
+          t('✅ Purchases Restored', '✅ Compras Restauradas'),
+          t('Your subscription has been restored successfully.', 'Tu suscripción ha sido restaurada exitosamente.'),
           [{ text: 'OK', onPress: () => loadStatus() }]
         );
       } else {
         Alert.alert(
-          'Sin Compras',
-          'No se encontraron compras anteriores para restaurar.'
+          t('No Purchases', 'Sin Compras'),
+          t('No previous purchases found to restore.', 'No se encontraron compras anteriores para restaurar.')
         );
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudieron restaurar las compras');
+      Alert.alert(t('Error', 'Error'), t('Could not restore purchases', 'No se pudieron restaurar las compras'));
     } finally {
       setPurchasing(false);
     }
@@ -201,13 +205,13 @@ export const PremiumScreen: React.FC = () => {
 
   const features = [
     {
-      name: 'Chat con Quest Coach',
+      name: t('Chat with Quest Coach', 'Chat con Quest Coach'),
       icon: '🤖',
-      freeValue: '5/día',
-      premiumValue: 'Ilimitado',
+      freeValue: t('5/day', '5/día'),
+      premiumValue: t('Unlimited', 'Ilimitado'),
     },
     {
-      name: 'Herramientas de IA',
+      name: t('AI Tools', 'Herramientas de IA'),
       icon: '🛠️',
       freeValue: '❌',
       premiumValue: '✅',
@@ -216,55 +220,55 @@ export const PremiumScreen: React.FC = () => {
       name: 'Life Paths',
       icon: '🗺️',
       freeValue: '2',
-      premiumValue: 'Ilimitados',
+      premiumValue: t('Unlimited', 'Ilimitados'),
     },
     {
-      name: 'Hábitos',
+      name: t('Habits', 'Hábitos'),
       icon: '🔄',
       freeValue: '5',
-      premiumValue: 'Ilimitados',
+      premiumValue: t('Unlimited', 'Ilimitados'),
     },
     {
-      name: 'Recordatorios',
+      name: t('Reminders', 'Recordatorios'),
       icon: '🔔',
       freeValue: '❌',
       premiumValue: '✅',
     },
     {
-      name: 'Historial de progreso',
+      name: t('Progress history', 'Historial de progreso'),
       icon: '📊',
-      freeValue: '7 días',
-      premiumValue: '1 año',
+      freeValue: t('7 days', '7 días'),
+      premiumValue: t('1 year', '1 año'),
     },
     {
-      name: 'Amigos',
+      name: t('Friends', 'Amigos'),
       icon: '👥',
       freeValue: '10',
-      premiumValue: 'Ilimitados',
+      premiumValue: t('Unlimited', 'Ilimitados'),
     },
     {
-      name: 'Crear gremios',
+      name: t('Create guilds', 'Crear gremios'),
       icon: '⚔️',
       freeValue: '❌',
       premiumValue: '✅',
     },
     {
-      name: 'Crear raids',
+      name: t('Create raids', 'Crear raids'),
       icon: '🐉',
       freeValue: '❌',
       premiumValue: '✅',
     },
     {
-      name: 'Avatares exclusivos',
+      name: t('Exclusive avatars', 'Avatares exclusivos'),
       icon: '🎭',
       freeValue: '❌',
       premiumValue: '✅',
     },
     {
-      name: 'Quests personalizadas',
+      name: t('Custom quests', 'Quests personalizadas'),
       icon: '⚡',
-      freeValue: '1/semana',
-      premiumValue: 'Ilimitadas',
+      freeValue: t('1/week', '1/semana'),
+      premiumValue: t('Unlimited', 'Ilimitadas'),
     },
   ];
 
@@ -276,7 +280,7 @@ export const PremiumScreen: React.FC = () => {
           <Text style={styles.crown}>👑</Text>
           <Text style={[styles.title, { color: theme.text }]}>Quest Premium</Text>
           <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-            Desbloquea todo tu potencial
+            {t('Unlock your full potential', 'Desbloquea todo tu potencial')}
           </Text>
         </View>
 
@@ -288,11 +292,11 @@ export const PremiumScreen: React.FC = () => {
                 <Text style={styles.statusEmoji}>✨</Text>
                 <View>
                   <Text style={[styles.statusTitle, { color: '#10B981' }]}>
-                    Premium {status.premiumType === 'trial' ? '(Prueba)' : 'Activo'}
+                    Premium {status.premiumType === 'trial' ? t('(Trial)', '(Prueba)') : t('Active', 'Activo')}
                   </Text>
                   {status.daysLeft !== null && (
                     <Text style={[styles.statusSubtitle, { color: theme.textSecondary }]}>
-                      {status.daysLeft} días restantes
+                      {t(`${status.daysLeft} days remaining`, `${status.daysLeft} días restantes`)}
                     </Text>
                   )}
                 </View>
@@ -302,10 +306,10 @@ export const PremiumScreen: React.FC = () => {
                 <Text style={styles.statusEmoji}>🆓</Text>
                 <View>
                   <Text style={[styles.statusTitle, { color: theme.text }]}>
-                    Plan Gratuito
+                    {t('Free Plan', 'Plan Gratuito')}
                   </Text>
                   <Text style={[styles.statusSubtitle, { color: theme.textSecondary }]}>
-                    {status.trialUsed ? 'Prueba ya usada' : '¡Prueba 1 mes gratis!'}
+                    {status.trialUsed ? t('Trial already used', 'Prueba ya usada') : t('Try 1 month free!', '¡Prueba 1 mes gratis!')}
                   </Text>
                 </View>
               </>
@@ -325,10 +329,10 @@ export const PremiumScreen: React.FC = () => {
             ) : (
               <>
                 <Text style={styles.trialButtonText}>
-                  🎁 Empezar 1 Mes Gratis
+                  🎁 {t('Start 1 Month Free', 'Empezar 1 Mes Gratis')}
                 </Text>
                 <Text style={styles.trialButtonSubtext}>
-                  Sin tarjeta de crédito
+                  {t('No credit card required', 'Sin tarjeta de crédito')}
                 </Text>
               </>
             )}
@@ -338,7 +342,7 @@ export const PremiumScreen: React.FC = () => {
         {/* Comparison Table Header */}
         <View style={styles.tableHeader}>
           <Text style={[styles.tableTitle, { color: theme.text }]}>
-            Comparación de Planes
+            {t('Plan Comparison', 'Comparación de Planes')}
           </Text>
           <View style={styles.tableLabels}>
             <Text style={[styles.tableLabel, { color: theme.textSecondary }]}>
@@ -365,7 +369,7 @@ export const PremiumScreen: React.FC = () => {
         {(!status?.isPremium || status?.premiumType === 'trial') && (
           <View style={styles.plansSection}>
             <Text style={[styles.plansTitle, { color: theme.text }]}>
-              Elige tu Plan
+              {t('Choose your Plan', 'Elige tu Plan')}
             </Text>
 
             {rcLoading ? (
@@ -390,7 +394,7 @@ export const PremiumScreen: React.FC = () => {
                     >
                       {isYearly && (
                         <View style={[styles.popularBadge, { backgroundColor: theme.primary }]}>
-                          <Text style={styles.popularText}>Más Popular</Text>
+                          <Text style={styles.popularText}>{t('Most Popular', 'Más Popular')}</Text>
                         </View>
                       )}
                       <View style={styles.planInfo}>
@@ -399,12 +403,12 @@ export const PremiumScreen: React.FC = () => {
                         </Text>
                         {isYearly && (
                           <Text style={[styles.planSavings, { color: '#10B981' }]}>
-                            Ahorra 50%
+                            {t('Save 50%', 'Ahorra 50%')}
                           </Text>
                         )}
                         {isLifetime && (
                           <Text style={[styles.planSavings, { color: '#10B981' }]}>
-                            Pago único
+                            {t('One-time payment', 'Pago único')}
                           </Text>
                         )}
                       </View>
@@ -413,7 +417,7 @@ export const PremiumScreen: React.FC = () => {
                           {pkg.price}
                         </Text>
                         <Text style={[styles.periodText, { color: theme.textSecondary }]}>
-                          {isLifetime ? 'para siempre' : isYearly ? '/año' : '/mes'}
+                          {isLifetime ? t('forever', 'para siempre') : isYearly ? t('/year', '/año') : t('/month', '/mes')}
                         </Text>
                       </View>
                       <View 
@@ -450,7 +454,7 @@ export const PremiumScreen: React.FC = () => {
                 >
                   {plan.popular && (
                     <View style={[styles.popularBadge, { backgroundColor: theme.primary }]}>
-                      <Text style={styles.popularText}>Más Popular</Text>
+                      <Text style={styles.popularText}>{t('Most Popular', 'Más Popular')}</Text>
                     </View>
                   )}
                   <View style={styles.planInfo}>
@@ -497,7 +501,7 @@ export const PremiumScreen: React.FC = () => {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <Text style={styles.purchaseButtonText}>
-                  Suscribirse Ahora
+                  {t('Subscribe Now', 'Suscribirse Ahora')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -507,7 +511,7 @@ export const PremiumScreen: React.FC = () => {
               onPress={handleRestorePurchases}
             >
               <Text style={[styles.restoreText, { color: theme.textSecondary }]}>
-                Restaurar compras anteriores
+                {t('Restore previous purchases', 'Restaurar compras anteriores')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -515,8 +519,7 @@ export const PremiumScreen: React.FC = () => {
 
         {/* Legal */}
         <Text style={[styles.legal, { color: theme.textSecondary }]}>
-          Al suscribirte, aceptas nuestros Términos de Servicio y Política de Privacidad. 
-          La suscripción se renueva automáticamente a menos que la canceles.
+          {t('By subscribing, you agree to our Terms of Service and Privacy Policy. Subscription renews automatically unless you cancel.', 'Al suscribirte, aceptas nuestros Términos de Servicio y Política de Privacidad. La suscripción se renueva automáticamente a menos que la canceles.')}
         </Text>
       </ScrollView>
 

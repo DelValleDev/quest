@@ -1,717 +1,393 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
+  StyleSheet,
   TouchableOpacity,
-  RefreshControl,
   Alert,
-  ActivityIndicator,
-  Modal,
+  RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore, useAuthStore } from '../../store';
-import { getTheme } from '../../theme/colors';
-import { supabase } from '../../lib/supabase';
-import type { RootStackParamList } from '../../../App';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ShopItem {
   id: string;
   name: string;
   description: string;
-  category: string;
-  subcategory?: string;
-  price: number;
-  original_price?: number;
+  price_qc: number;
+  item_type: 'cosmetic' | 'power_up' | 'boost';
   icon: string;
-  rarity: string;
-  item_data: any;
-  required_level: number;
-  is_limited: boolean;
-  stock?: number;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
 }
 
-interface UserInventory {
-  item_id: string;
-  is_equipped: boolean;
-  quantity: number;
-}
-
-const CATEGORIES = [
-  { id: 'all', label: 'All', icon: '🛒' },
-  { id: 'avatar', label: 'Avatars', icon: '🦸' },
-  { id: 'theme', label: 'Themes', icon: '🎨' },
-  { id: 'badge', label: 'Badges', icon: '🏅' },
-  { id: 'booster', label: 'Boosters', icon: '⚡' },
-  { id: 'cosmetic', label: 'Cosmetics', icon: '✨' },
-];
-
-const RARITY_COLORS: Record<string, string> = {
-  common: '#9CA3AF',
-  uncommon: '#22C55E',
-  rare: '#3B82F6',
-  epic: '#A855F7',
-  legendary: '#F59E0B',
-};
-
-export const ShopScreen: React.FC = () => {
-  const { mode } = useThemeStore();
-  const { user } = useAuthStore();
-  const theme = getTheme(mode);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
+export default function ShopScreen() {
+  const { user } = useAuth();
   const [items, setItems] = useState<ShopItem[]>([]);
-  const [inventory, setInventory] = useState<UserInventory[]>([]);
   const [userCoins, setUserCoins] = useState(0);
-  const [userLevel, setUserLevel] = useState(1);
+  const [filter, setFilter] = useState<'all' | 'cosmetic' | 'power_up' | 'boost'>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null);
-  const [purchasing, setPurchasing] = useState(false);
-
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      // Fetch shop items
-      const { data: shopItems, error: shopError } = await supabase
-        .from('shop_items')
-        .select('*')
-        .eq('is_available', true)
-        .order('sort_order');
-
-      if (shopError) throw shopError;
-      setItems(shopItems || []);
-
-      // Fetch user inventory
-      const { data: userInventory, error: invError } = await supabase
-        .from('user_inventory')
-        .select('item_id, is_equipped, quantity')
-        .eq('user_id', user.id);
-
-      if (!invError) {
-        setInventory(userInventory || []);
-      }
-
-      // Fetch user profile for coins and level
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('quest_coins, level')
-        .eq('id', user.id)
-        .single();
-
-      if (!profileError && profile) {
-        setUserCoins(profile.quest_coins || 0);
-        setUserLevel(profile.level || 1);
-      }
-    } catch (error) {
-      console.error('Error fetching shop data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [user]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    loadData();
+  }, [filter]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchData();
+  const loadData = async () => {
+    setLoading(true);
+    await Promise.all([loadShopItems(), loadUserCoins()]);
+    setLoading(false);
+    setRefreshing(false);
   };
 
-  const isOwned = (itemId: string) => {
-    return inventory.some((inv) => inv.item_id === itemId);
+  const loadShopItems = async () => {
+    let query = supabase.from('shop_items').select('*').eq('is_available', true);
+
+    if (filter !== 'all') {
+      query = query.eq('item_type', filter);
+    }
+
+    const { data, error } = await query.order('price_qc', { ascending: true });
+
+    if (!error && data) {
+      setItems(data);
+    }
   };
 
-  const getOwnedQuantity = (itemId: string) => {
-    const inv = inventory.find((i) => i.item_id === itemId);
-    return inv?.quantity || 0;
+  const loadUserCoins = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('quest_coins')
+      .eq('id', user?.id)
+      .single();
+
+    if (data) {
+      setUserCoins(data.quest_coins);
+    }
   };
 
-  const handlePurchase = async (item: ShopItem) => {
-    if (!user) return;
-
-    if (userCoins < item.price) {
-      Alert.alert('Not Enough Coins', `You need ${item.price - userCoins} more Quest Coins.`);
+  const buyItem = async (item: ShopItem) => {
+    if (userCoins < item.price_qc) {
+      Alert.alert('Fondos Insuficientes', 'No tienes suficientes Quest Coins para comprar este item.');
       return;
     }
 
-    if (userLevel < item.required_level) {
-      Alert.alert('Level Required', `You need to be level ${item.required_level} to buy this item.`);
-      return;
-    }
+    Alert.alert(
+      'Confirmar Compra',
+      `¿Quieres comprar ${item.name} por ${item.price_qc} QC?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Comprar',
+          onPress: async () => {
+            // Deduct coins
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ quest_coins: userCoins - item.price_qc })
+              .eq('id', user?.id);
 
-    // For non-consumables, check if already owned
-    if (item.category !== 'booster' && isOwned(item.id)) {
-      Alert.alert('Already Owned', 'You already own this item!');
-      return;
-    }
+            if (!updateError) {
+              // Add to inventory
+              await supabase.from('user_inventory').insert({
+                user_id: user?.id,
+                item_id: item.id,
+              });
 
-    setPurchasing(true);
-
-    try {
-      const { data, error } = await supabase.rpc('purchase_item', {
-        p_user_id: user.id,
-        p_item_id: item.id,
-        p_quantity: 1,
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        Alert.alert('Purchase Successful! 🎉', `You bought ${item.name}!`);
-        setUserCoins(data.new_balance);
-        setSelectedItem(null);
-        fetchData(); // Refresh inventory
-      } else {
-        Alert.alert('Purchase Failed', data?.error || 'Unknown error');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to purchase item');
-    } finally {
-      setPurchasing(false);
-    }
-  };
-
-  const filteredItems = selectedCategory === 'all'
-    ? items
-    : items.filter((item) => item.category === selectedCategory);
-
-  const renderItem = (item: ShopItem) => {
-    const owned = isOwned(item.id);
-    const quantity = getOwnedQuantity(item.id);
-    const canAfford = userCoins >= item.price;
-    const meetsLevel = userLevel >= item.required_level;
-    const rarityColor = RARITY_COLORS[item.rarity] || RARITY_COLORS.common;
-
-    return (
-      <TouchableOpacity
-        key={item.id}
-        style={[
-          styles.itemCard,
-          { backgroundColor: theme.surface, borderColor: rarityColor },
-        ]}
-        onPress={() => setSelectedItem(item)}
-        activeOpacity={0.7}
-      >
-        {/* Rarity indicator */}
-        <View style={[styles.rarityBadge, { backgroundColor: rarityColor }]}>
-          <Text style={styles.rarityText}>{item.rarity.toUpperCase()}</Text>
-        </View>
-
-        {/* Icon */}
-        <Text style={styles.itemIcon}>{item.icon}</Text>
-
-        {/* Name */}
-        <Text style={[styles.itemName, { color: theme.text }]} numberOfLines={1}>
-          {item.name}
-        </Text>
-
-        {/* Price or Owned */}
-        {owned && item.category !== 'booster' ? (
-          <View style={[styles.ownedBadge, { backgroundColor: theme.success + '30' }]}>
-            <Text style={[styles.ownedText, { color: theme.success }]}>✓ Owned</Text>
-          </View>
-        ) : (
-          <View style={styles.priceRow}>
-            {item.original_price && (
-              <Text style={[styles.originalPrice, { color: theme.textMuted }]}>
-                {item.original_price}
-              </Text>
-            )}
-            <Text
-              style={[
-                styles.price,
-                { color: canAfford ? theme.warning : theme.error },
-              ]}
-            >
-              🪙 {item.price}
-            </Text>
-          </View>
-        )}
-
-        {/* Quantity for boosters */}
-        {item.category === 'booster' && quantity > 0 && (
-          <Text style={[styles.quantityBadge, { color: theme.primary }]}>
-            x{quantity}
-          </Text>
-        )}
-
-        {/* Level requirement */}
-        {!meetsLevel && (
-          <Text style={[styles.levelReq, { color: theme.error }]}>
-            Lvl {item.required_level}
-          </Text>
-        )}
-      </TouchableOpacity>
+              Alert.alert('¡Compra Exitosa!', `Has adquirido ${item.name}`);
+              loadData();
+            }
+          },
+        },
+      ]
     );
   };
 
-  const renderItemModal = () => {
-    if (!selectedItem) return null;
+  const getRarityColor = (rarity: string) => {
+    const colors = {
+      common: '#94A3B8',
+      rare: '#3B82F6',
+      epic: '#A855F7',
+      legendary: '#F59E0B',
+    };
+    return colors[rarity as keyof typeof colors] || '#94A3B8';
+  };
 
-    const owned = isOwned(selectedItem.id);
-    const canAfford = userCoins >= selectedItem.price;
-    const meetsLevel = userLevel >= selectedItem.required_level;
-    const rarityColor = RARITY_COLORS[selectedItem.rarity] || RARITY_COLORS.common;
+  const getRarityLabel = (rarity: string) => {
+    const labels = {
+      common: 'Común',
+      rare: 'Raro',
+      epic: 'Épico',
+      legendary: 'Legendario',
+    };
+    return labels[rarity as keyof typeof labels] || 'Común';
+  };
 
-    return (
-      <Modal
-        visible={!!selectedItem}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedItem(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-            {/* Close button */}
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setSelectedItem(null)}
-            >
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Tienda</Text>
+        <View style={styles.coinsDisplay}>
+          <Text style={styles.coinsIcon}>🪙</Text>
+          <Text style={styles.coinsText}>{userCoins} QC</Text>
+        </View>
+      </View>
 
-            {/* Item details */}
-            <View style={[styles.modalHeader, { borderColor: rarityColor }]}>
-              <Text style={styles.modalIcon}>{selectedItem.icon}</Text>
-              <Text style={[styles.modalName, { color: theme.text }]}>
-                {selectedItem.name}
-              </Text>
-              <Text style={[styles.modalRarity, { color: rarityColor }]}>
-                {selectedItem.rarity.toUpperCase()}
-              </Text>
-            </View>
-
-            <Text style={[styles.modalDescription, { color: theme.textSecondary }]}>
-              {selectedItem.description}
+      {/* Filters */}
+      <View style={styles.filters}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
+            onPress={() => setFilter('all')}
+          >
+            <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
+              Todos
             </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'cosmetic' && styles.filterButtonActive]}
+            onPress={() => setFilter('cosmetic')}
+          >
+            <Text style={[styles.filterText, filter === 'cosmetic' && styles.filterTextActive]}>
+              Cosméticos
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'power_up' && styles.filterButtonActive]}
+            onPress={() => setFilter('power_up')}
+          >
+            <Text style={[styles.filterText, filter === 'power_up' && styles.filterTextActive]}>
+              Power-Ups
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterButton, filter === 'boost' && styles.filterButtonActive]}
+            onPress={() => setFilter('boost')}
+          >
+            <Text style={[styles.filterText, filter === 'boost' && styles.filterTextActive]}>
+              Boosts
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
 
-            <View style={styles.modalInfo}>
-              <Text style={[styles.modalCategory, { color: theme.textMuted }]}>
-                Category: {selectedItem.category}
-              </Text>
-              {selectedItem.required_level > 1 && (
-                <Text
+      {/* Shop Items */}
+      <ScrollView
+        style={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} />}
+      >
+        <View style={styles.grid}>
+          {items.map((item) => (
+            <View key={item.id} style={styles.itemCard}>
+              <View style={[styles.itemHeader, { borderColor: getRarityColor(item.rarity) }]}>
+                <Text style={styles.itemIcon}>{item.icon}</Text>
+                <View
                   style={[
-                    styles.modalLevel,
-                    { color: meetsLevel ? theme.textMuted : theme.error },
+                    styles.rarityBadge,
+                    { backgroundColor: getRarityColor(item.rarity) + '20' },
                   ]}
                 >
-                  Required Level: {selectedItem.required_level}
-                </Text>
-              )}
-              {selectedItem.is_limited && (
-                <Text style={[styles.limitedBadge, { color: theme.error }]}>
-                  ⏰ Limited Time!
-                </Text>
-              )}
-              {selectedItem.stock !== null && selectedItem.stock !== undefined && (
-                <Text style={[styles.stockText, { color: theme.warning }]}>
-                  Stock: {selectedItem.stock} left
-                </Text>
-              )}
-            </View>
-
-            {/* Price and Buy button */}
-            <View style={styles.modalFooter}>
-              <View>
-                {selectedItem.original_price && (
-                  <Text style={[styles.modalOriginalPrice, { color: theme.textMuted }]}>
-                    🪙 {selectedItem.original_price}
-                  </Text>
-                )}
-                <Text style={[styles.modalPrice, { color: theme.warning }]}>
-                  🪙 {selectedItem.price}
-                </Text>
-              </View>
-
-              {owned && selectedItem.category !== 'booster' ? (
-                <View style={[styles.ownedButton, { backgroundColor: theme.success + '30' }]}>
-                  <Text style={[styles.ownedButtonText, { color: theme.success }]}>
-                    ✓ Owned
+                  <Text style={[styles.rarityText, { color: getRarityColor(item.rarity) }]}>
+                    {getRarityLabel(item.rarity)}
                   </Text>
                 </View>
-              ) : (
+              </View>
+
+              <Text style={styles.itemName}>{item.name}</Text>
+              <Text style={styles.itemDescription}>{item.description}</Text>
+
+              <View style={styles.itemFooter}>
+                <View style={styles.priceTag}>
+                  <Text style={styles.priceIcon}>🪙</Text>
+                  <Text style={styles.priceText}>{item.price_qc} QC</Text>
+                </View>
                 <TouchableOpacity
                   style={[
                     styles.buyButton,
-                    {
-                      backgroundColor:
-                        canAfford && meetsLevel ? theme.primary : theme.textMuted,
-                    },
+                    userCoins < item.price_qc && styles.buyButtonDisabled,
                   ]}
-                  onPress={() => handlePurchase(selectedItem)}
-                  disabled={!canAfford || !meetsLevel || purchasing}
+                  onPress={() => buyItem(item)}
+                  disabled={userCoins < item.price_qc}
                 >
-                  {purchasing ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.buyButtonText}>
-                      {!meetsLevel
-                        ? `Lvl ${selectedItem.required_level} Required`
-                        : !canAfford
-                        ? 'Not Enough Coins'
-                        : 'Buy Now'}
-                    </Text>
-                  )}
+                  <Text style={styles.buyButtonText}>
+                    {userCoins < item.price_qc ? '🔒' : 'Comprar'}
+                  </Text>
                 </TouchableOpacity>
-              )}
+              </View>
             </View>
-          </View>
+          ))}
         </View>
-      </Modal>
-    );
-  };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-        <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 50 }} />
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>🛒 Shop</Text>
-        <TouchableOpacity 
-          style={[styles.coinDisplay, { backgroundColor: theme.surface }]}
-          onPress={() => navigation.navigate('BuyCoins')}
-        >
-          <Text style={styles.coinIcon}>🪙</Text>
-          <Text style={[styles.coinAmount, { color: theme.warning }]}>{userCoins}</Text>
-          <Text style={[styles.buyCoinsButton, { color: theme.primary }]}>+</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Categories */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoriesContainer}
-        contentContainerStyle={styles.categoriesContent}
-      >
-        {CATEGORIES.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            style={[
-              styles.categoryButton,
-              {
-                backgroundColor:
-                  selectedCategory === cat.id ? theme.primary : theme.surface,
-              },
-            ]}
-            onPress={() => setSelectedCategory(cat.id)}
-          >
-            <Text style={styles.categoryIcon}>{cat.icon}</Text>
-            <Text
-              style={[
-                styles.categoryLabel,
-                { color: selectedCategory === cat.id ? '#fff' : theme.text },
-              ]}
-            >
-              {cat.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Items Grid */}
-      <ScrollView
-        style={styles.itemsContainer}
-        contentContainerStyle={styles.itemsGrid}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.primary}
-          />
-        }
-      >
-        {filteredItems.length === 0 ? (
+        {items.length === 0 && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🏪</Text>
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              No items in this category
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.grid}>
-            {filteredItems.map(renderItem)}
+            <Text style={styles.emptyIcon}>🛒</Text>
+            <Text style={styles.emptyText}>No hay items disponibles</Text>
+            <Text style={styles.emptySubtext}>Vuelve más tarde</Text>
           </View>
         )}
       </ScrollView>
-
-      {/* Item Detail Modal */}
-      {renderItemModal()}
-    </SafeAreaView>
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#0F172A',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingTop: 60,
+    paddingBottom: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
+    color: '#FFFFFF',
   },
-  coinDisplay: {
+  coinsDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
-  coinIcon: {
-    fontSize: 18,
-    marginRight: 6,
-  },
-  coinAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buyCoinsButton: {
+  coinsIcon: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  categoriesContainer: {
-    maxHeight: 60,
-  },
-  categoriesContent: {
-    paddingHorizontal: 15,
-    gap: 10,
-  },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  categoryIcon: {
-    fontSize: 16,
     marginRight: 6,
   },
-  categoryLabel: {
+  coinsText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#F59E0B',
+  },
+  filters: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  filterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#1E293B',
+    marginRight: 8,
+  },
+  filterButtonActive: {
+    backgroundColor: '#6366F1',
+  },
+  filterText: {
+    color: '#94A3B8',
     fontSize: 14,
+  },
+  filterTextActive: {
+    color: '#FFFFFF',
     fontWeight: '600',
   },
-  itemsContainer: {
+  list: {
     flex: 1,
-    marginTop: 10,
-  },
-  itemsGrid: {
-    paddingHorizontal: 15,
-    paddingBottom: 20,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    gap: 12,
   },
   itemCard: {
-    width: '48%',
-    padding: 15,
+    width: '47%',
+    backgroundColor: '#1E293B',
     borderRadius: 16,
-    marginBottom: 15,
+    padding: 16,
+    marginBottom: 12,
+  },
+  itemHeader: {
     alignItems: 'center',
-    borderWidth: 2,
-    position: 'relative',
-  },
-  rarityBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  rarityText: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    color: '#fff',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 2,
   },
   itemIcon: {
-    fontSize: 40,
-    marginBottom: 10,
-  },
-  itemName: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontSize: 48,
     marginBottom: 8,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  originalPrice: {
-    fontSize: 12,
-    textDecorationLine: 'line-through',
-  },
-  price: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  ownedBadge: {
-    paddingHorizontal: 10,
+  rarityBadge: {
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 6,
   },
-  ownedText: {
-    fontSize: 12,
+  rarityText: {
+    fontSize: 10,
     fontWeight: '600',
   },
-  quantityBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    fontSize: 12,
+  itemName: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 6,
+    textAlign: 'center',
   },
-  levelReq: {
-    fontSize: 10,
-    marginTop: 4,
+  itemDescription: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginBottom: 12,
+    textAlign: 'center',
+    minHeight: 36,
+  },
+  itemFooter: {
+    flexDirection: 'column',
+    gap: 8,
+  },
+  priceTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F172A',
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  priceIcon: {
+    fontSize: 16,
+    marginRight: 4,
+  },
+  priceText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#F59E0B',
+  },
+  buyButton: {
+    backgroundColor: '#6366F1',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buyButtonDisabled: {
+    backgroundColor: '#334155',
+  },
+  buyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 60,
   },
   emptyIcon: {
-    fontSize: 60,
-    marginBottom: 15,
+    fontSize: 64,
+    marginBottom: 16,
   },
   emptyText: {
-    fontSize: 16,
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: 20,
-    padding: 20,
-    position: 'relative',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  closeButtonText: {
     fontSize: 18,
-    color: '#fff',
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
-  modalHeader: {
-    alignItems: 'center',
-    paddingBottom: 15,
-    borderBottomWidth: 2,
-    marginBottom: 15,
-  },
-  modalIcon: {
-    fontSize: 60,
-    marginBottom: 10,
-  },
-  modalName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  modalRarity: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginTop: 5,
-  },
-  modalDescription: {
+  emptySubtext: {
     fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 15,
-  },
-  modalInfo: {
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 20,
-  },
-  modalCategory: {
-    fontSize: 12,
-    textTransform: 'capitalize',
-  },
-  modalLevel: {
-    fontSize: 12,
-  },
-  limitedBadge: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  stockText: {
-    fontSize: 12,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  modalOriginalPrice: {
-    fontSize: 14,
-    textDecorationLine: 'line-through',
-  },
-  modalPrice: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  buyButton: {
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 25,
-    minWidth: 140,
-    alignItems: 'center',
-  },
-  buyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  ownedButton: {
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  ownedButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#64748B',
   },
 });

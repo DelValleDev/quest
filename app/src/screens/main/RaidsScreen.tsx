@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { PaywallModal } from '../../components';
@@ -112,8 +112,12 @@ const CHALLENGE_ICONS: Record<string, string> = {
 // =====================================================
 export const RaidsScreen: React.FC = () => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   // State
   const [loading, setLoading] = useState(true);
@@ -231,7 +235,7 @@ export const RaidsScreen: React.FC = () => {
   const createRaid = async () => {
     if (!selectedTemplate) return;
     if (selectedFriends.length < 2) {
-      Alert.alert('Need More Friends', 'Select at least 2 friends to start a raid!');
+      Alert.alert(t('Need More Friends', 'Necesitas Más Amigos'), t('Select at least 2 friends to start a raid!', '¡Selecciona al menos 2 amigos para empezar un raid!'));
       return;
     }
 
@@ -252,9 +256,9 @@ export const RaidsScreen: React.FC = () => {
       }
 
       Alert.alert(
-        '⚔️ Raid Started!',
-        `${selectedTemplate.title} has begun! Rally your friends!`,
-        [{ text: 'Let\'s Go!', onPress: () => {
+        t('⚔️ Raid Started!', '¡⚔️ Raid Iniciado!'),
+        t(`${selectedTemplate.title} has begun! Rally your friends!`, `¡${selectedTemplate.title} ha comenzado! ¡Reúne a tus amigos!`),
+        [{ text: t('Let\'s Go!', '¡Vamos!'), onPress: () => {
           setShowCreateModal(false);
           setSelectedTemplate(null);
           setSelectedFriends([]);
@@ -263,7 +267,7 @@ export const RaidsScreen: React.FC = () => {
       );
     } catch (error) {
       console.error('Error creating raid:', error);
-      Alert.alert('Error', 'Failed to create raid');
+      Alert.alert(t('Error', 'Error'), t('Failed to create raid', 'Error al crear el raid'));
     } finally {
       setCreating(false);
     }
@@ -284,7 +288,7 @@ export const RaidsScreen: React.FC = () => {
         return;
       }
 
-      Alert.alert('⚔️ Joined!', 'You joined the raid!');
+      Alert.alert(t('⚔️ Joined!', '¡⚔️ Te uniste!'), t('You joined the raid!', '¡Te uniste al raid!'));
       fetchData();
     } catch (error) {
       console.error('Error joining raid:', error);
@@ -308,7 +312,7 @@ export const RaidsScreen: React.FC = () => {
       }
 
       if (data?.completed) {
-        Alert.alert('🎉 Completed!', 'You finished your part of the raid!');
+        Alert.alert(t('🎉 Completed!', '¡🎉 Completado!'), t('You finished your part of the raid!', '¡Terminaste tu parte del raid!'));
       }
 
       fetchData();
@@ -402,15 +406,15 @@ export const RaidsScreen: React.FC = () => {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>⚔️</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>No Active Raids</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('No Active Raids', 'No Hay Raids Activos')}</Text>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            Create a raid or check available ones from friends!
+            {t('Create a raid or check available ones from friends!', '¡Crea un raid o revisa los disponibles de tus amigos!')}
           </Text>
           <TouchableOpacity
             style={[styles.createButton, { backgroundColor: theme.primary }]}
             onPress={handleCreatePress}
           >
-            <Text style={styles.createButtonText}>⚔️ Start a Raid {!isPremium && '👑'}</Text>
+            <Text style={styles.createButtonText}>⚔️ {t('Start a Raid', 'Iniciar Raid')} {!isPremium && '👑'}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -447,7 +451,7 @@ export const RaidsScreen: React.FC = () => {
             <View style={styles.progressSection}>
               <View style={styles.progressHeader}>
                 <Text style={[styles.progressLabel, { color: theme.textSecondary }]}>
-                  Your Progress
+                  {t('Your Progress', 'Tu Progreso')}
                 </Text>
                 <Text style={[styles.progressValue, { color: theme.text }]}>
                   {raid.my_progress}/{raid.target_value} {raid.target_unit}
@@ -466,10 +470,9 @@ export const RaidsScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Team Progress */}
             <View style={styles.teamProgress}>
               <Text style={[styles.teamLabel, { color: theme.textSecondary }]}>
-                Team: {raid.completed_participants}/{raid.total_participants} completed
+                {t(`Team: ${raid.completed_participants}/${raid.total_participants} completed`, `Equipo: ${raid.completed_participants}/${raid.total_participants} completados`)}
               </Text>
               <View style={styles.participantDots}>
                 {Array(raid.total_participants).fill(0).map((_, i) => (
@@ -494,7 +497,7 @@ export const RaidsScreen: React.FC = () => {
                 style={[styles.updateButton, { backgroundColor: theme.primary }]}
                 onPress={() => promptProgress(raid)}
               >
-                <Text style={styles.updateButtonText}>📊 Update Progress</Text>
+                <Text style={styles.updateButtonText}>📊 {t('Update Progress', 'Actualizar Progreso')}</Text>
               </TouchableOpacity>
             )}
 
@@ -514,9 +517,9 @@ export const RaidsScreen: React.FC = () => {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>No Available Raids</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('No Available Raids', 'No Hay Raids Disponibles')}</Text>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            Your friends haven't started any raids yet.
+            {t('Your friends haven\'t started any raids yet.', 'Tus amigos aún no han iniciado ningún raid.')}
           </Text>
         </View>
       );
@@ -565,7 +568,7 @@ export const RaidsScreen: React.FC = () => {
               style={[styles.joinButton, { backgroundColor: '#22C55E' }]}
               onPress={() => joinRaid(raid.raid_id)}
             >
-              <Text style={styles.joinButtonText}>⚔️ Join Raid</Text>
+              <Text style={styles.joinButtonText}>⚔️ {t('Join Raid', 'Unirse al Raid')}</Text>
             </TouchableOpacity>
           </View>
         ))}
@@ -580,9 +583,9 @@ export const RaidsScreen: React.FC = () => {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📜</Text>
-          <Text style={[styles.emptyTitle, { color: theme.text }]}>No Raid History</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>{t('No Raid History', 'Sin Historial de Raids')}</Text>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-            Complete some raids to see your history!
+            {t('Complete some raids to see your history!', '¡Completa algunos raids para ver tu historial!')}
           </Text>
         </View>
       );
@@ -618,14 +621,14 @@ export const RaidsScreen: React.FC = () => {
                 ]}
               >
                 <Text style={[styles.statusText, { color: getStatusColor(raid.status) }]}>
-                  {raid.status === 'completed' ? '✓ Success' : '✗ Failed'}
+                  {raid.status === 'completed' ? t('✓ Success', '✓ Éxito') : t('✗ Failed', '✗ Fallido')}
                 </Text>
               </View>
             </View>
 
             <View style={styles.historyMeta}>
               <Text style={[styles.historyReward, { color: theme.textSecondary }]}>
-                {raid.my_status === 'completed' ? `+${raid.xp_reward} XP earned` : 'No reward'}
+                {raid.my_status === 'completed' ? t(`+${raid.xp_reward} XP earned`, `+${raid.xp_reward} XP ganados`) : t('No reward', 'Sin recompensa')}
               </Text>
             </View>
           </View>
@@ -644,9 +647,9 @@ export const RaidsScreen: React.FC = () => {
       <SafeAreaView style={[styles.modalContainer, { backgroundColor: theme.background }]}>
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={() => setShowCreateModal(false)}>
-            <Text style={[styles.modalClose, { color: theme.primary }]}>Cancel</Text>
+            <Text style={[styles.modalClose, { color: theme.primary }]}>{t('Cancel', 'Cancelar')}</Text>
           </TouchableOpacity>
-          <Text style={[styles.modalTitle, { color: theme.text }]}>Start a Raid</Text>
+          <Text style={[styles.modalTitle, { color: theme.text }]}>{t('Start a Raid', 'Iniciar Raid')}</Text>
           <TouchableOpacity
             onPress={createRaid}
             disabled={!selectedTemplate || selectedFriends.length < 2 || creating}
@@ -661,7 +664,7 @@ export const RaidsScreen: React.FC = () => {
                 },
               ]}
             >
-              {creating ? 'Creating...' : 'Create'}
+              {creating ? t('Creating...', 'Creando...') : t('Create', 'Crear')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -669,7 +672,7 @@ export const RaidsScreen: React.FC = () => {
         <ScrollView style={styles.modalContent}>
           {/* Select Template */}
           <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Choose a Challenge
+            {t('Choose a Challenge', 'Elige un Desafío')}
           </Text>
           <ScrollView
             horizontal

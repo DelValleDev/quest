@@ -3,6 +3,10 @@
 -- Description: Functions to start trial and check premium status
 -- =====================================================
 
+-- Drop existing functions to avoid conflicts
+DROP FUNCTION IF EXISTS public.start_premium_trial(UUID);
+DROP FUNCTION IF EXISTS public.check_premium_status(UUID);
+
 CREATE OR REPLACE FUNCTION public.start_premium_trial(p_user_id UUID)
 RETURNS JSONB
 LANGUAGE plpgsql

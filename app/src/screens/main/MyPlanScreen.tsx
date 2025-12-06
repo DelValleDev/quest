@@ -16,15 +16,19 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { PremiumService, SUBSCRIPTION_PLANS, PremiumStatus } from '../../lib/premium';
 
 export const MyPlanScreen: React.FC = () => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<PremiumStatus | null>(null);
@@ -60,17 +64,17 @@ export const MyPlanScreen: React.FC = () => {
 
   const getPlanName = (type: string) => {
     switch (type) {
-      case 'free': return 'Plan Gratuito';
-      case 'trial': return 'Prueba Premium';
-      case 'monthly': return 'Premium Mensual';
-      case 'yearly': return 'Premium Anual';
-      case 'lifetime': return 'Premium de por Vida';
+      case 'free': return t('Free Plan', 'Plan Gratuito');
+      case 'trial': return t('Premium Trial', 'Prueba Premium');
+      case 'monthly': return t('Monthly Premium', 'Premium Mensual');
+      case 'yearly': return t('Yearly Premium', 'Premium Anual');
+      case 'lifetime': return t('Lifetime Premium', 'Premium de por Vida');
       default: return type;
     }
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('es-ES', {
+    return new Date(date).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -90,9 +94,9 @@ export const MyPlanScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={[styles.backText, { color: theme.primary }]}>← Volver</Text>
+          <Text style={[styles.backText, { color: theme.primary }]}>← {t('Back', 'Volver')}</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.text }]}>Mi Plan</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('My Plan', 'Mi Plan')}</Text>
         <View style={{ width: 60 }} />
       </View>
 
@@ -113,10 +117,10 @@ export const MyPlanScreen: React.FC = () => {
               {status?.isPremium && status.daysLeft && (
                 <Text style={[styles.planExpiry, { color: theme.textSecondary }]}>
                   {status.premiumType === 'trial' 
-                    ? `${status.daysLeft} días de prueba restantes`
+                    ? t(`${status.daysLeft} trial days remaining`, `${status.daysLeft} días de prueba restantes`)
                     : status.premiumType !== 'lifetime'
-                    ? `Expira en ${status.daysLeft} días`
-                    : 'Sin expiración'
+                    ? t(`Expires in ${status.daysLeft} days`, `Expira en ${status.daysLeft} días`)
+                    : t('No expiration', 'Sin expiración')
                   }
                 </Text>
               )}
@@ -126,38 +130,38 @@ export const MyPlanScreen: React.FC = () => {
           {status?.isPremium ? (
             <View style={styles.benefitsList}>
               <Text style={[styles.benefitsTitle, { color: theme.text }]}>
-                ✅ Tienes acceso a:
+                ✅ {t('You have access to:', 'Tienes acceso a:')}
               </Text>
               <Text style={[styles.benefitItem, { color: theme.textSecondary }]}>
-                • Chat ilimitado con IA
+                • {t('Unlimited AI chat', 'Chat ilimitado con IA')}
               </Text>
               <Text style={[styles.benefitItem, { color: theme.textSecondary }]}>
                 • Quest Finanzas 💰
               </Text>
               <Text style={[styles.benefitItem, { color: theme.textSecondary }]}>
-                • Crear raids y gremios
+                • {t('Create raids and guilds', 'Crear raids y gremios')}
               </Text>
               <Text style={[styles.benefitItem, { color: theme.textSecondary }]}>
-                • Análisis avanzado
+                • {t('Advanced analytics', 'Análisis avanzado')}
               </Text>
               <Text style={[styles.benefitItem, { color: theme.textSecondary }]}>
-                • Hábitos ilimitados
+                • {t('Unlimited habits', 'Hábitos ilimitados')}
               </Text>
               <Text style={[styles.benefitItem, { color: theme.textSecondary }]}>
-                • IA en grupos
+                • {t('AI in groups', 'IA en grupos')}
               </Text>
             </View>
           ) : (
             <View style={styles.upgradeSection}>
               <Text style={[styles.upgradeText, { color: theme.textSecondary }]}>
-                Desbloquea todas las funciones premium
+                {t('Unlock all premium features', 'Desbloquea todas las funciones premium')}
               </Text>
               <TouchableOpacity
                 style={[styles.upgradeButton, { backgroundColor: theme.primary }]}
                 onPress={() => navigation.navigate('Premium')}
               >
                 <Text style={styles.upgradeButtonText}>
-                  {status?.trialUsed ? '👑 Ver Planes Premium' : '🎁 Probar Gratis 1 Mes'}
+                  {status?.trialUsed ? t('👑 View Premium Plans', '👑 Ver Planes Premium') : t('🎁 Try Free 1 Month', '🎁 Probar Gratis 1 Mes')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -168,25 +172,25 @@ export const MyPlanScreen: React.FC = () => {
         {!status?.isPremium && (
           <View style={[styles.comparisonCard, { backgroundColor: theme.surface }]}>
             <Text style={[styles.comparisonTitle, { color: theme.text }]}>
-              ¿Qué obtienes con Premium?
+              {t('What do you get with Premium?', '¿Qué obtienes con Premium?')}
             </Text>
             
             <View style={styles.featureRow}>
-              <Text style={[styles.featureName, { color: theme.textSecondary }]}>Chat con IA</Text>
-              <Text style={[styles.featureFree, { color: theme.textMuted }]}>5/día</Text>
-              <Text style={[styles.featurePremium, { color: '#F59E0B' }]}>Ilimitado</Text>
+              <Text style={[styles.featureName, { color: theme.textSecondary }]}>{t('AI Chat', 'Chat con IA')}</Text>
+              <Text style={[styles.featureFree, { color: theme.textMuted }]}>{t('5/day', '5/día')}</Text>
+              <Text style={[styles.featurePremium, { color: '#F59E0B' }]}>{t('Unlimited', 'Ilimitado')}</Text>
             </View>
             
             <View style={styles.featureRow}>
-              <Text style={[styles.featureName, { color: theme.textSecondary }]}>Hábitos</Text>
+              <Text style={[styles.featureName, { color: theme.textSecondary }]}>{t('Habits', 'Hábitos')}</Text>
               <Text style={[styles.featureFree, { color: theme.textMuted }]}>5</Text>
-              <Text style={[styles.featurePremium, { color: '#F59E0B' }]}>Ilimitados</Text>
+              <Text style={[styles.featurePremium, { color: '#F59E0B' }]}>{t('Unlimited', 'Ilimitados')}</Text>
             </View>
             
             <View style={styles.featureRow}>
               <Text style={[styles.featureName, { color: theme.textSecondary }]}>Life Paths</Text>
               <Text style={[styles.featureFree, { color: theme.textMuted }]}>2</Text>
-              <Text style={[styles.featurePremium, { color: '#F59E0B' }]}>Ilimitados</Text>
+              <Text style={[styles.featurePremium, { color: '#F59E0B' }]}>{t('Unlimited', 'Ilimitados')}</Text>
             </View>
             
             <View style={styles.featureRow}>

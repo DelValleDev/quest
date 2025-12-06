@@ -14,31 +14,38 @@
 
 ## 🚀 What is QUEST?
 
-**QUEST** is a gamified personal coach that transforms your goals into a multiplayer game. An AI analyzes who you are today and who you want to become, creating a day-by-day plan to get you there.
+**QUEST** is the best app for transforming your life. An AI coach that truly knows you—analyzing who you are today and who you want to become—creating a personalized day-by-day plan to get you there.
 
-It's **Duolingo + Strava + Habitica + Personal Coach**, but for **YOUR ENTIRE LIFE**.
+### Why QUEST is the Best App for Personal Growth
 
-### 🎯 Elevator Pitch
+- 🧠 **AI that actually understands you** - Not generic advice. Your coach learns from your assessment, habits, and progress
+- 🎮 **Makes self-improvement fun** - Daily quests, streaks, XP, levels, and rewards that keep you engaged
+- 👥 **Social accountability that works** - Challenge friends, form guilds, and grow together
+- 📊 **Holistic approach** - 6 life pillars ensure balanced growth, not just one area
+- 🎯 **Personalized difficulty** - Challenges adapt to YOUR level and schedule
+- 🏆 **Real progress tracking** - See your transformation with visual analytics
 
-Complete daily missions, challenge your friends with real stakes, maintain epic streaks, and literally become a better version of yourself. Not just tracking—it's **guided transformation**.
+### 🎯 Our Mission
+
+Help you become the best version of yourself—not by overwhelming you with tasks, but by guiding you one quest at a time. Complete daily missions, maintain epic streaks, challenge your friends, and literally level up your life.
 
 ---
 
 ## ✨ Main Features
 
 ### 🤖 AI Personal Coach
-- **Personalized transformation plan** (180 days)
-- **Adaptive daily challenges** based on your routine
-- **Pattern analysis** and progress tracking
-- **24/7 conversational chat** with your AI coach
+- **Personalized transformation plan** based on your assessment
+- **Adaptive daily challenges** that fit your routine
+- **Pattern analysis** and intelligent progress tracking  
+- **24/7 conversational chat** - ask anything, get personalized guidance
 
 ### 📊 Multidimensional System (6 Pillars)
-- 💪 **PHYSICAL**: Exercise, nutrition, health
-- 🧠 **MENTAL**: Learning, productivity
-- ❤️ **SOCIAL**: Relationships, community
-- 💼 **PROFESSIONAL**: Career, projects
-- 🕉️ **SPIRITUAL**: Inner peace, purpose
-- 🎨 **CREATIVE**: Art, hobbies
+- 💪 **PHYSICAL**: Exercise, nutrition, sleep, health
+- 🧠 **MENTAL**: Learning, focus, productivity, mindfulness
+- ❤️ **SOCIAL**: Relationships, communication, community
+- 💼 **PROFESSIONAL**: Career, projects, skills, goals
+- ✨ **SPIRITUAL**: Inner peace, purpose, gratitude
+- 🎨 **CREATIVE**: Art, hobbies, self-expression
 
 ### ⚔️ Challenge System
 - **Personal challenges** with streak system
@@ -225,31 +232,38 @@ For questions, feedback, or collaboration:
 
 ## 🚀 ¿Qué es QUEST?
 
-**QUEST** es un coach personal gamificado que transforma tus metas en un juego multijugador. Una IA analiza quién eres hoy y quién quieres ser, creando un plan día a día para llegar ahí.
+**QUEST** es la mejor app para transformar tu vida. Un coach de IA que realmente te conoce—analiza quién eres hoy y quién quieres ser—creando un plan personalizado día a día para llegar ahí.
 
-Es **Duolingo + Strava + Habitica + Coach Personal**, pero para **TODA tu vida**.
+### Por qué QUEST es la Mejor App para Crecer
 
-### 🎯 Elevator Pitch
+- 🧠 **IA que realmente te entiende** - No consejos genéricos. Tu coach aprende de tu evaluación, hábitos y progreso
+- 🎮 **Hace divertido el auto-mejoramiento** - Quests diarias, rachas, XP, niveles y recompensas que te mantienen enganchado
+- 👥 **Responsabilidad social que funciona** - Reta a amigos, forma guildas, y crezcan juntos
+- 📊 **Enfoque holístico** - 6 pilares de vida aseguran crecimiento equilibrado
+- 🎯 **Dificultad personalizada** - Los retos se adaptan a TU nivel y horario
+- 🏆 **Progreso real medible** - Ve tu transformación con análisis visuales
 
-Completa misiones diarias, reta a tus amigos con stakes reales, mantén rachas épicas, y conviértete literalmente en una mejor versión de ti mismo. No solo tracking—es **transformación guiada**.
+### 🎯 Nuestra Misión
+
+Ayudarte a convertirte en la mejor versión de ti mismo—no abrumándote con tareas, sino guiándote una quest a la vez. Completa misiones diarias, mantén rachas épicas, reta a tus amigos, y literalmente sube de nivel tu vida.
 
 ---
 
 ## ✨ Características Principales
 
 ### 🤖 IA Coach Personal
-- **Plan de transformación personalizado** (180 días)
-- **Desafíos diarios adaptativos** basados en tu rutina
-- **Análisis de patrones** y seguimiento de progreso
-- **Chat conversacional 24/7** con tu coach IA
+- **Plan de transformación personalizado** basado en tu evaluación
+- **Desafíos diarios adaptativos** que se ajustan a tu rutina
+- **Análisis de patrones** y seguimiento inteligente de progreso
+- **Chat conversacional 24/7** - pregunta lo que sea, recibe guía personalizada
 
 ### 📊 Sistema Multidimensional (6 Pilares)
-- 💪 **FÍSICO**: Ejercicio, nutrición, salud
-- 🧠 **MENTAL**: Aprendizaje, productividad
-- ❤️ **SOCIAL**: Relaciones, comunidad
-- 💼 **PROFESIONAL**: Carrera, proyectos
-- 🕉️ **ESPIRITUAL**: Paz interior, propósito
-- 🎨 **CREATIVO**: Arte, hobbies
+- 💪 **FÍSICO**: Ejercicio, nutrición, sueño, salud
+- 🧠 **MENTAL**: Aprendizaje, enfoque, productividad, mindfulness
+- ❤️ **SOCIAL**: Relaciones, comunicación, comunidad
+- 💼 **PROFESIONAL**: Carrera, proyectos, habilidades, metas
+- ✨ **ESPIRITUAL**: Paz interior, propósito, gratitud
+- 🎨 **CREATIVO**: Arte, hobbies, expresión personal
 
 ### ⚔️ Sistema de Retos
 - **Retos personales** con sistema de rachas

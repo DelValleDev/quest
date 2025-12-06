@@ -101,20 +101,30 @@ const DraggableSlider: React.FC<DraggableSliderProps> = ({
       onPanResponderGrant: (evt) => {
         // Notify parent to disable scroll via ref
         onSlideStartRef.current?.();
+        // Guard against null nativeEvent (synthetic event pooling)
+        const pageX = evt.nativeEvent?.pageX;
+        if (pageX == null) return;
         // Get the slider position when touch starts
-        sliderRef.current?.measure((x, y, w, h, pageX, pageY) => {
-          sliderXRef.current = pageX;
-          const newValue = calculateValue(evt.nativeEvent.pageX);
+        sliderRef.current?.measure((x, y, w, h, sliderPageX, pageY) => {
+          sliderXRef.current = sliderPageX;
+          const newValue = calculateValue(pageX);
           onValueChangeRef.current(newValue);
         });
       },
       onPanResponderMove: (evt) => {
-        const newValue = calculateValue(evt.nativeEvent.pageX);
+        // Guard against null nativeEvent (synthetic event pooling)
+        const pageX = evt.nativeEvent?.pageX;
+        if (pageX == null) return;
+        const newValue = calculateValue(pageX);
         onValueChangeRef.current(newValue);
       },
       onPanResponderRelease: (evt) => {
-        const newValue = calculateValue(evt.nativeEvent.pageX);
-        onValueChangeRef.current(newValue);
+        // Guard against null nativeEvent (synthetic event pooling)
+        const pageX = evt.nativeEvent?.pageX;
+        if (pageX != null) {
+          const newValue = calculateValue(pageX);
+          onValueChangeRef.current(newValue);
+        }
         // Notify parent to enable scroll again via ref
         onSlideEndRef.current?.();
       },
@@ -540,14 +550,26 @@ export const AssessmentScreen: React.FC<AssessmentScreenProps> = ({ onBackToSetu
         .eq('id', user?.id)
         .single();
 
+      // Get active pillars selected by user
+      const { data: activePillarsData } = await supabase
+        .from('user_pillars')
+        .select('pillar_id')
+        .eq('user_id', user?.id)
+        .eq('is_active', true)
+        .order('priority', { ascending: true });
+
+      const activePillars = activePillarsData?.map(p => p.pillar_id) || 
+        ['physical', 'mental', 'social', 'professional', 'spiritual', 'creative'];
+
       setAnalysisStatus(t('assessment.analyzingAI'));
 
-      // Use AI to analyze assessment (pass language for proper response)
+      // Use AI to analyze assessment (pass language and active pillars)
       const analysis = await questAI.analyzeAssessment(
         questions,
         answers,
         profile?.display_name || undefined,
-        language // Pass language so AI responds in correct language
+        language, // Pass language so AI responds in correct language
+        activePillars // Pass active pillars for focused generation
       );
 
       setAnalysisStatus(t('assessment.savingProfile'));
@@ -593,16 +615,10 @@ export const AssessmentScreen: React.FC<AssessmentScreenProps> = ({ onBackToSetu
         }
       }
 
-      // Save Life Paths from AI
+      // NOTE: Life Paths are NOT created automatically after assessment
+      // The user should request/create them manually based on their priorities
+      // This gives users control over what long-term goals they want to focus on
       let createdPathIds: string[] = [];
-      if (analysis.life_paths && analysis.life_paths.length > 0) {
-        setAnalysisStatus(t('assessment.designingPaths'));
-        try {
-          createdPathIds = await questAI.saveGeneratedLifePaths(user?.id || '', analysis.life_paths);
-        } catch (e) {
-          console.warn('Could not save life paths:', e);
-        }
-      }
 
       // Save Habits from AI
       if (analysis.habits && analysis.habits.length > 0) {

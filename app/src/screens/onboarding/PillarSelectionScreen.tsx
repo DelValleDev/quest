@@ -112,33 +112,30 @@ export const PillarSelectionScreen: React.FC<PillarSelectionScreenProps> = ({
     if (selectedPillars.length === 0) return;
 
     try {
-      // Save selected pillars to database
+      // Update user_pillars to set is_active based on selection
+      // First, deactivate all pillars
       await supabase
-        .from('profiles')
-        .update({ selected_pillars: selectedPillars })
-        .eq('id', user?.id);
-
-      // Also insert into user_pillar_focus table
-      const focusEntries = selectedPillars.map((pillarId, index) => ({
-        user_id: user?.id,
-        pillar_id: pillarId,
-        priority: index + 1,
-      }));
-
-      // Delete existing entries first
-      await supabase
-        .from('user_pillar_focus')
-        .delete()
+        .from('user_pillars')
+        .update({ is_active: false, priority: 0 })
         .eq('user_id', user?.id);
 
-      // Insert new entries
-      await supabase
-        .from('user_pillar_focus')
-        .insert(focusEntries);
+      // Then activate selected pillars with priority
+      for (let i = 0; i < selectedPillars.length; i++) {
+        await supabase
+          .from('user_pillars')
+          .update({ 
+            is_active: true, 
+            priority: i + 1,
+            activated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user?.id)
+          .eq('pillar_id', selectedPillars[i]);
+      }
 
       onComplete(selectedPillars);
     } catch (err) {
       console.error('Error saving pillar selection:', err);
+      // Continue anyway so user isn't stuck
       onComplete(selectedPillars);
     }
   };

@@ -9,12 +9,18 @@ import {
   RefreshControl,
   Animated,
 } from 'react-native';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PillarProgressChart } from '../../components/PillarProgressChart';
+import { PenaltyWarningBanner } from '../../components/PenaltyWarningBanner';
+import { PenaltyNotification } from '../../components/PenaltyNotification';
+import { PenaltyService, PenaltyLog } from '../../lib/penalties';
+import { useAchievementMonitor, useBadgeMonitor } from '../../hooks/useEventMonitor';
+import QuestAIToast from '../../components/QuestAIToast';
+import type { ProactiveMessage } from '../../lib/proactiveAI';
 
 type RootStackParamList = {
   Main: undefined;
@@ -50,8 +56,70 @@ interface DailyQuest {
   completed: boolean;
 }
 
-// Quest Mascot messages based on context
-const MASCOT_MESSAGES = {
+interface UserPillar {
+  pillar_id: string;
+  level: number;
+  current_xp: number;
+}
+
+interface ActiveChallenge {
+  id: string;
+  challenge: {
+    id: string;
+    title: string;
+    pillar_id: string;
+    xp_reward: number;
+    icon: string;
+  };
+}
+
+const PILLARS = [
+  { id: 'physical', name: 'Physical', nameEs: 'Físico', emoji: '💪', color: '#EF4444' },
+  { id: 'mental', name: 'Mental', nameEs: 'Mental', emoji: '🧠', color: '#3B82F6' },
+  { id: 'social', name: 'Social', nameEs: 'Social', emoji: '👥', color: '#EC4899' },
+  { id: 'professional', name: 'Professional', nameEs: 'Profesional', emoji: '💼', color: '#10B981' },
+  { id: 'spiritual', name: 'Spiritual', nameEs: 'Espiritual', emoji: '✨', color: '#8B5CF6' },
+  { id: 'creative', name: 'Creative', nameEs: 'Creativo', emoji: '🎨', color: '#F97316' },
+];
+
+// Mascot messages in both languages
+const MASCOT_MESSAGES_EN = {
+  morning: [
+    "Good morning, champion! 🌅 Today is a new day to grow.",
+    "☀️ The dawn brings new opportunities. Let's conquer them!",
+    "🌄 Every morning is a blank page. Write something epic!",
+  ],
+  afternoon: [
+    "💪 Keep it up! You've already achieved a lot today.",
+    "🔥 The afternoon is perfect for completing your missions.",
+    "⚡ You're halfway there! Don't stop.",
+  ],
+  evening: [
+    "🌙 Finish the day strong. You can do it!",
+    "✨ The night is young and you're unstoppable.",
+    "🌟 Reflect on your achievements today.",
+  ],
+  streak: [
+    "🔥 {streak} day streak! You're a legend!",
+    "💎 {streak} day streak. Consistency is power!",
+    "⚡ {streak} days in a row. Nothing stops you!",
+  ],
+  newUser: [
+    "🎮 Welcome to Quest! Your adventure begins now.",
+    "🚀 I'm Quest, your companion. Let's be amazing together!",
+    "✨ Complete the assessment to discover your strengths.",
+  ],
+  lowScore: [
+    "📈 {pillar} needs attention. I'll help you improve!",
+    "💪 Small steps in {pillar} = big results.",
+  ],
+  highScore: [
+    "🏆 Your {pillar} is shining! Keep it up.",
+    "⭐ You're very strong in {pillar}. Inspire others!",
+  ],
+};
+
+const MASCOT_MESSAGES_ES = {
   morning: [
     "¡Buenos días, campeón! 🌅 Hoy es un nuevo día para crecer.",
     "☀️ El amanecer trae nuevas oportunidades. ¡A conquistarlas!",
@@ -87,36 +155,17 @@ const MASCOT_MESSAGES = {
   ],
 };
 
-interface UserPillar {
-  pillar_id: string;
-  level: number;
-  current_xp: number;
-}
-
-interface ActiveChallenge {
-  id: string;
-  challenge: {
-    id: string;
-    title: string;
-    pillar_id: string;
-    xp_reward: number;
-    icon: string;
-  };
-}
-
-const PILLARS = [
-  { id: 'physical', name: 'Physical', emoji: '💪', color: '#EF4444' },
-  { id: 'mental', name: 'Mental', emoji: '🧠', color: '#3B82F6' },
-  { id: 'social', name: 'Social', emoji: '👥', color: '#EC4899' },
-  { id: 'professional', name: 'Professional', emoji: '💼', color: '#10B981' },
-  { id: 'spiritual', name: 'Spiritual', emoji: '✨', color: '#8B5CF6' },
-  { id: 'creative', name: 'Creative', emoji: '🎨', color: '#F97316' },
-];
-
 export const HomeScreen: React.FC = () => {
   const { mode, toggleTheme } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  
+  // Translation helper function
+  const t = (en: string, es: string) => language === 'es' ? es : en;
+  
+  // Get mascot messages based on language
+  const MASCOT_MESSAGES = language === 'es' ? MASCOT_MESSAGES_ES : MASCOT_MESSAGES_EN;
   
   const [userId, setUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -126,6 +175,20 @@ export const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [mascotBounce] = useState(new Animated.Value(0));
   const [fabPulse] = useState(new Animated.Value(1));
+  const [showPenaltyModal, setShowPenaltyModal] = useState(false);
+  const [todayPenalties, setTodayPenalties] = useState<PenaltyLog[]>([]);
+  const [aiMessage, setAiMessage] = useState<ProactiveMessage | null>(null);
+
+  // Monitor for achievement and badge unlocks
+  useAchievementMonitor({
+    userId: userId || '',
+    onAchievementUnlocked: (message) => setAiMessage(message),
+  });
+
+  useBadgeMonitor({
+    userId: userId || '',
+    onBadgeUnlocked: (message) => setAiMessage(message),
+  });
 
   // FAB pulse animation
   useEffect(() => {
@@ -217,10 +280,11 @@ export const HomeScreen: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
+
       setUserId(user.id);
 
-      // Fetch profile with assessment fields
+      // Check for penalties from today
+      checkTodayPenalties(user.id);      // Fetch profile with assessment fields
       let { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('display_name, level, total_xp, quest_coins, current_streak, assessment_completed, pillar_scores')
@@ -308,6 +372,25 @@ export const HomeScreen: React.FC = () => {
     return pillar?.level || 1;
   };
 
+  const checkTodayPenalties = async (uid: string) => {
+    try {
+      const stats = await PenaltyService.getUserPenaltyStats(uid, 1);
+      if (stats && stats.recent_penalties.length > 0) {
+        setTodayPenalties(stats.recent_penalties);
+        // Show modal if there are penalties from today
+        const today = new Date().toISOString().split('T')[0];
+        const hasToday = stats.recent_penalties.some(
+          p => p.penalty_date === today
+        );
+        if (hasToday) {
+          setShowPenaltyModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking penalties:', error);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
     <ScrollView
@@ -317,14 +400,17 @@ export const HomeScreen: React.FC = () => {
         <RefreshControl refreshing={loading} onRefresh={fetchData} />
       }
     >
+      {/* Penalty Warning Banner */}
+      <PenaltyWarningBanner />
+
       {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: theme.textSecondary }]}>
-            Welcome back,
+            {t('Welcome back,', 'Bienvenido de nuevo,')}
           </Text>
           <Text style={[styles.name, { color: theme.text }]}>
-            {profile?.display_name || 'Adventurer'} 👋
+            {profile?.display_name || t('Adventurer', 'Aventurero')} 👋
           </Text>
         </View>
         <View style={styles.headerActions}>
@@ -373,10 +459,10 @@ export const HomeScreen: React.FC = () => {
         <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
           <Text style={styles.statCardEmoji}>⚡</Text>
           <Text style={[styles.statCardValue, { color: theme.text }]}>
-            Lv {profile?.level || 1}
+            {t('Lv', 'Nv')} {profile?.level || 1}
           </Text>
           <Text style={[styles.statCardLabel, { color: theme.textSecondary }]}>
-            Level
+            {t('Level', 'Nivel')}
           </Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
@@ -385,7 +471,7 @@ export const HomeScreen: React.FC = () => {
             {profile?.current_streak || 0}
           </Text>
           <Text style={[styles.statCardLabel, { color: theme.textSecondary }]}>
-            Streak
+            {t('Streak', 'Racha')}
           </Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
@@ -394,7 +480,7 @@ export const HomeScreen: React.FC = () => {
             {profile?.quest_coins || 0}
           </Text>
           <Text style={[styles.statCardLabel, { color: theme.textSecondary }]}>
-            Coins
+            {t('Coins', 'Monedas')}
           </Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: theme.surface }]}>
@@ -403,7 +489,7 @@ export const HomeScreen: React.FC = () => {
             {profile?.total_xp || 0}
           </Text>
           <Text style={[styles.statCardLabel, { color: theme.textSecondary }]}>
-            Total XP
+            {t('Total XP', 'XP Total')}
           </Text>
         </View>
       </View>
@@ -411,7 +497,7 @@ export const HomeScreen: React.FC = () => {
       {/* XP Progress Bar */}
       <View style={[styles.xpCard, { backgroundColor: theme.surface }]}>
         <View style={styles.xpHeader}>
-          <Text style={[styles.xpTitle, { color: theme.text }]}>Progress to Level {(profile?.level || 1) + 1}</Text>
+          <Text style={[styles.xpTitle, { color: theme.text }]}>{t('Progress to Level', 'Progreso al Nivel')} {(profile?.level || 1) + 1}</Text>
           <Text style={[styles.xpAmount, { color: theme.primary }]}>
             {profile?.total_xp ? profile.total_xp % 100 : 0} / 100 XP
           </Text>
@@ -432,7 +518,7 @@ export const HomeScreen: React.FC = () => {
       {/* Today's Daily Quests */}
       {dailyQuests.length > 0 && (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>🎯 Today's Quests</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>🎯 {t("Today's Quests", 'Quests de Hoy')}</Text>
           {dailyQuests.map((quest) => {
             const pillar = PILLARS.find((p) => p.id === quest.pillar_id);
             return (
@@ -476,7 +562,7 @@ export const HomeScreen: React.FC = () => {
 
       {/* Pillars Section */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Pillars</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('Your Pillars', 'Tus Pilares')}</Text>
         <View style={styles.pillarsGrid}>
           {PILLARS.map((pillar) => {
             const pillarScore = profile?.pillar_scores?.[pillar.id] || 0;
@@ -487,10 +573,10 @@ export const HomeScreen: React.FC = () => {
               >
                 <Text style={styles.pillarEmoji}>{pillar.emoji}</Text>
                 <Text style={[styles.pillarName, { color: theme.text }]}>
-                  {pillar.name}
+                  {language === 'es' ? pillar.nameEs : pillar.name}
                 </Text>
                 <Text style={[styles.pillarLevel, { color: pillar.color }]}>
-                  Lv {getPillarLevel(pillar.id)}
+                  {t('Lv', 'Nv')} {getPillarLevel(pillar.id)}
                 </Text>
                 {profile?.assessment_completed && (
                   <View style={[styles.pillarScoreBadge, { backgroundColor: pillar.color + '20' }]}>
@@ -513,13 +599,13 @@ export const HomeScreen: React.FC = () => {
       {/* Active Challenges */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Active Quests ({activeChallenges.length})
+          {t('Active Quests', 'Quests Activas')} ({activeChallenges.length})
         </Text>
         {activeChallenges.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: theme.surface }]}>
             <Text style={styles.emptyIcon}>⚔️</Text>
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              No active quests. Go to Quests tab to start one!
+              {t('No active quests. Go to Quests tab to start one!', '¡No hay quests activas. Ve a la pestaña Quests para comenzar una!')}
             </Text>
           </View>
         ) : (
@@ -546,7 +632,7 @@ export const HomeScreen: React.FC = () => {
                   </Text>
                 </View>
                 <View style={[styles.statusBadge, { backgroundColor: '#22C55E20' }]}>
-                  <Text style={[styles.statusText, { color: '#22C55E' }]}>Active</Text>
+                  <Text style={[styles.statusText, { color: '#22C55E' }]}>{t('Active', 'Activa')}</Text>
                 </View>
               </View>
             );
@@ -556,35 +642,35 @@ export const HomeScreen: React.FC = () => {
 
       {/* Quick Actions */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('Quick Actions', 'Acciones Rápidas')}</Text>
         <View style={styles.quickActionsRow}>
           <TouchableOpacity
             style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
             onPress={() => navigation.navigate('LifePaths')}
           >
             <Text style={styles.quickActionIcon}>🎯</Text>
-            <Text style={[styles.quickActionLabel, { color: theme.text }]}>Paths</Text>
+            <Text style={[styles.quickActionLabel, { color: theme.text }]}>{t('Paths', 'Rutas')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
             onPress={() => navigation.navigate('Agenda')}
           >
             <Text style={styles.quickActionIcon}>📅</Text>
-            <Text style={[styles.quickActionLabel, { color: theme.text }]}>Agenda</Text>
+            <Text style={[styles.quickActionLabel, { color: theme.text }]}>{t('Agenda', 'Agenda')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
             onPress={() => navigation.navigate('Duels')}
           >
             <Text style={styles.quickActionIcon}>⚔️</Text>
-            <Text style={[styles.quickActionLabel, { color: theme.text }]}>Duels</Text>
+            <Text style={[styles.quickActionLabel, { color: theme.text }]}>{t('Duels', 'Duelos')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.quickActionCard, { backgroundColor: theme.surface }]}
             onPress={() => navigation.navigate('Raids')}
           >
             <Text style={styles.quickActionIcon}>🐉</Text>
-            <Text style={[styles.quickActionLabel, { color: theme.text }]}>Raids</Text>
+            <Text style={[styles.quickActionLabel, { color: theme.text }]}>{t('Raids', 'Raids')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -597,9 +683,9 @@ export const HomeScreen: React.FC = () => {
         >
           <Text style={styles.ctaEmoji}>🎯</Text>
           <View style={styles.ctaContent}>
-            <Text style={styles.ctaTitle}>Complete Your Assessment</Text>
+            <Text style={styles.ctaTitle}>{t('Complete Your Assessment', 'Completa tu Evaluación')}</Text>
             <Text style={styles.ctaSubtitle}>
-              Discover your strengths and areas to improve
+              {t('Discover your strengths and areas to improve', 'Descubre tus fortalezas y áreas a mejorar')}
             </Text>
           </View>
           <Text style={styles.ctaArrow}>→</Text>
@@ -988,3 +1074,20 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
 });
+
+      {/* Penalty Notification Modal */}
+      <PenaltyNotification
+        visible={showPenaltyModal}
+        penalties={todayPenalties}
+        onClose={() => setShowPenaltyModal(false)}
+      />
+
+      {/* Quest AI Proactive Message Toast */}
+      <QuestAIToast 
+        message={aiMessage} 
+        onDismiss={() => setAiMessage(null)}
+        duration={4000}
+      />
+    </View>
+  );
+};

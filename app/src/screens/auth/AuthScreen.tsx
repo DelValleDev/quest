@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { SocialAuth } from '../../lib/socialAuth';
@@ -29,16 +29,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const handleAuth = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('Error', 'Error'), t('Please fill in all fields', 'Por favor completa todos los campos'));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert(t('Error', 'Error'), t('Password must be at least 6 characters', 'La contraseña debe tener al menos 6 caracteres'));
       return;
     }
 
@@ -53,9 +57,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         if (error) {
           if (error.message.includes('Email not confirmed')) {
             Alert.alert(
-              '🤖 Email Not Verified',
-              'Please check your inbox and verify your email before signing in.',
-              [{ text: 'OK' }]
+              t('🤖 Email Not Verified', '🤖 Email No Verificado'),
+              t('Please check your inbox and verify your email before signing in.', 'Por favor revisa tu bandeja de entrada y verifica tu email antes de iniciar sesión.'),
+              [{ text: t('OK', 'OK') }]
             );
             return;
           }
@@ -113,21 +117,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
       <View style={styles.header}>
         <Text style={styles.logo}>🤖</Text>
         <Text style={[styles.title, { color: theme.text }]}>
-          {isLogin ? 'Welcome Back' : 'Join the Quest'}
+          {isLogin ? t('Welcome Back', 'Bienvenido de Nuevo') : t('Join the Quest', 'Únete a Quest')}
         </Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           {isLogin
-            ? 'Sign in to continue your journey'
-            : 'Create an account to start your transformation'}
+            ? t('Sign in to continue your journey', 'Inicia sesión para continuar tu viaje')
+            : t('Create an account to start your transformation', 'Crea una cuenta para comenzar tu transformación')}
         </Text>
       </View>
 
       <View style={styles.form}>
         <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Email</Text>
+          <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('Email', 'Correo')}</Text>
           <TextInput
             style={[styles.input, { color: theme.text }]}
-            placeholder="your@email.com"
+            placeholder={t('your@email.com', 'tu@email.com')}
             placeholderTextColor={theme.textMuted}
             value={email}
             onChangeText={setEmail}
@@ -137,7 +141,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         </View>
 
         <View style={[styles.inputContainer, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Password</Text>
+          <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('Password', 'Contraseña')}</Text>
           <TextInput
             style={[styles.input, { color: theme.text }]}
             placeholder="••••••••"
@@ -157,7 +161,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.buttonText}>
-              {isLogin ? 'Sign In' : 'Create Account'}
+              {isLogin ? t('Sign In', 'Iniciar Sesión') : t('Create Account', 'Crear Cuenta')}
             </Text>
           )}
         </TouchableOpacity>
@@ -166,7 +170,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         <View style={styles.dividerContainer}>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <Text style={[styles.dividerText, { color: theme.textMuted }]}>
-            o continúa con
+            {t('or continue with', 'o continúa con')}
           </Text>
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
         </View>
@@ -211,9 +215,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           onPress={() => setIsLogin(!isLogin)}
         >
           <Text style={[styles.switchText, { color: theme.textSecondary }]}>
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
+            {isLogin ? t("Don't have an account? ", "¿No tienes cuenta? ") : t('Already have an account? ', '¿Ya tienes cuenta? ')}
             <Text style={{ color: theme.primary, fontWeight: '600' }}>
-              {isLogin ? 'Sign Up' : 'Sign In'}
+              {isLogin ? t('Sign Up', 'Regístrate') : t('Sign In', 'Inicia Sesión')}
             </Text>
           </Text>
         </TouchableOpacity>
@@ -230,14 +234,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
           <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
             <Text style={styles.modalEmoji}>📧</Text>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
-              Check Your Email!
+              {t('Check Your Email!', '¡Revisa tu Correo!')}
             </Text>
             <Text style={[styles.modalMessage, { color: theme.textSecondary }]}>
-              We sent a verification link to{'\n'}
+              {t('We sent a verification link to', 'Enviamos un enlace de verificación a')}{'\n'}
               <Text style={{ color: theme.primary, fontWeight: '600' }}>{email}</Text>
             </Text>
             <Text style={[styles.modalHint, { color: theme.textMuted }]}>
-              Click the link in the email to verify your account, then come back and sign in.
+              {t('Click the link in the email to verify your account, then come back and sign in.', 'Haz clic en el enlace del email para verificar tu cuenta, luego vuelve e inicia sesión.')}
             </Text>
             <TouchableOpacity
               style={[styles.modalButton, { backgroundColor: theme.primary }]}
@@ -247,7 +251,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
                 setPassword('');
               }}
             >
-              <Text style={styles.modalButtonText}>Got it!</Text>
+              <Text style={styles.modalButtonText}>{t('Got it!', '¡Entendido!')}</Text>
             </TouchableOpacity>
           </View>
         </View>

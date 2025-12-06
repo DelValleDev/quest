@@ -10,12 +10,16 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 import questAI from '../../lib/openai';
 import { QuestDetailModal } from '../../components/QuestDetailModal';
+import ProactiveAI from '../../lib/proactiveAI';
+import QuestAIToast from '../../components/QuestAIToast';
+import type { ProactiveMessage } from '../../lib/proactiveAI';
+import { AddPositiveActivityModal } from '../../components/AddPositiveActivityModal';
 
 const { width } = Dimensions.get('window');
 
@@ -36,13 +40,22 @@ interface DailyQuest {
   };
 }
 
-const PILLARS: Record<string, { name: string; emoji: string; color: string }> = {
+const PILLARS_EN: Record<string, { name: string; emoji: string; color: string }> = {
   physical: { name: 'Physical', emoji: '💪', color: '#EF4444' },
   mental: { name: 'Mental', emoji: '🧠', color: '#3B82F6' },
   social: { name: 'Social', emoji: '👥', color: '#EC4899' },
   professional: { name: 'Professional', emoji: '💼', color: '#10B981' },
   spiritual: { name: 'Spiritual', emoji: '✨', color: '#8B5CF6' },
   creative: { name: 'Creative', emoji: '🎨', color: '#F97316' },
+};
+
+const PILLARS_ES: Record<string, { name: string; emoji: string; color: string }> = {
+  physical: { name: 'Físico', emoji: '💪', color: '#EF4444' },
+  mental: { name: 'Mental', emoji: '🧠', color: '#3B82F6' },
+  social: { name: 'Social', emoji: '👥', color: '#EC4899' },
+  professional: { name: 'Profesional', emoji: '💼', color: '#10B981' },
+  spiritual: { name: 'Espiritual', emoji: '✨', color: '#8B5CF6' },
+  creative: { name: 'Creativo', emoji: '🎨', color: '#F97316' },
 };
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -58,7 +71,14 @@ interface DailyQuestsProps {
 
 export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false }) => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
+  
+  // Language-aware pillars
+  const PILLARS = language === 'es' ? PILLARS_ES : PILLARS_EN;
 
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +89,8 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
   const [userMood, setUserMood] = useState<string | null>(null);
   const [selectedQuest, setSelectedQuest] = useState<any>(null);
   const [showQuestDetail, setShowQuestDetail] = useState(false);
+  const [aiMessage, setAiMessage] = useState<ProactiveMessage | null>(null);
+  const [showAddActivityModal, setShowAddActivityModal] = useState(false);
 
   // Generate quests with AI based on user profile
   const generateAIQuests = async (mood?: string) => {
@@ -235,11 +257,99 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
         });
 
       if (!rpcError && result?.success) {
-        Alert.alert(
-          'Quest Complete! 🎉',
-          `+${result.xp_earned} XP | +${result.coins_earned} 🪙${result.all_completed_bonus ? '\n🏆 All daily quests bonus!' : ''}`,
-          [{ text: 'Awesome!' }]
-        );
+        // Determine which message type to show (priority: all_quests > level_up > streak > quest_complete)
+        let messageShown = false;
+
+        try {
+          // Check for ALL quests completed FIRST (highest priority and most rare)
+          if (result.all_completed_bonus) {
+            const allQuestsMsg = await ProactiveAI.generate({
+              userId: user.id,
+              type: 'all_quests_complete',
+              data: {
+                xpEarned: result.xp_earned,
+                coinsEarned: result.coins_earned,
+                allQuestsCompleted: true,
+              },
+            });
+            if (allQuestsMsg) {
+              setAiMessage(allQuestsMsg);
+              messageShown = true;
+            }
+          }
+
+          // Check for level up (high priority)
+          if (!messageShown && result.new_level) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('level')
+              .eq('id', user.id)
+              .single();
+
+            if (profile && result.new_level > profile.level) {
+              const levelUpMsg = await ProactiveAI.generate({
+                userId: user.id,
+                type: 'level_up',
+                data: {
+                  newLevel: result.new_level,
+                  xpEarned: result.xp_earned,
+                },
+              });
+              if (levelUpMsg) {
+                setAiMessage(levelUpMsg);
+                messageShown = true;
+              }
+            }
+          }
+
+          // Check for streak milestone (if no level up message)
+          if (!messageShown && result.new_streak && [7, 14, 30, 60, 100, 365].includes(result.new_streak)) {
+            const streakMsg = await ProactiveAI.generate({
+              userId: user.id,
+              type: 'streak',
+              data: {
+                streakDays: result.new_streak,
+              },
+            });
+            if (streakMsg) {
+              setAiMessage(streakMsg);
+              messageShown = true;
+            }
+          }
+
+          // Show quest complete message if nothing else shown
+          if (!messageShown) {
+            const questMsg = await ProactiveAI.generate({
+              userId: user.id,
+              type: 'quest_complete',
+              data: {
+                questTitle: quest.challenge.title,
+                xpEarned: result.xp_earned,
+                coinsEarned: result.coins_earned,
+              },
+            });
+            if (questMsg) {
+              setAiMessage(questMsg);
+              messageShown = true;
+            }
+          }
+
+          // Fallback to alert if no AI message shown
+          if (!messageShown) {
+            Alert.alert(
+              'Quest Complete! 🎉',
+              `+${result.xp_earned} XP | +${result.coins_earned} 🪙${result.all_completed_bonus ? '\n🏆 All daily quests bonus!' : ''}`,
+              [{ text: 'Awesome!' }]
+            );
+          }
+        } catch (err) {
+          console.error('Error generating AI message:', err);
+          Alert.alert(
+            'Quest Complete! 🎉',
+            `+${result.xp_earned} XP | +${result.coins_earned} 🪙${result.all_completed_bonus ? '\n🏆 All daily quests bonus!' : ''}`,
+            [{ text: 'Awesome!' }]
+          );
+        }
         fetchDailyQuests();
         return;
       }
@@ -301,46 +411,73 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
           .eq('id', user.id);
       }
 
-      // Update pillar XP
-      const { data: pillarData } = await supabase
-        .from('user_pillars')
-        .select('current_xp, level, challenges_completed')
-        .eq('user_id', user.id)
-        .eq('pillar_id', quest.challenge.pillar_id)
-        .single();
+      // Update pillar XP using add_pillar_xp RPC (respects active/inactive pillars)
+      try {
+        const { data: pillarResult, error: pillarError } = await supabase.rpc('add_pillar_xp', {
+          p_user_id: user.id,
+          p_pillar_id: quest.challenge.pillar_id,
+          p_xp_amount: quest.challenge.xp_reward,
+        });
 
-      if (pillarData) {
-        const newPillarXp = pillarData.current_xp + quest.challenge.xp_reward;
-        const xpForNextLevel = pillarData.level * 100;
-        let newPillarLevel = pillarData.level;
-        let remainingXp = newPillarXp;
+        if (pillarError) {
+          // Fallback to direct update if RPC doesn't exist yet
+          console.warn('add_pillar_xp RPC not found, using fallback:', pillarError);
+          const { data: pillarData } = await supabase
+            .from('user_pillars')
+            .select('current_xp, level, challenges_completed, is_active')
+            .eq('user_id', user.id)
+            .eq('pillar_id', quest.challenge.pillar_id)
+            .single();
 
-        if (newPillarXp >= xpForNextLevel) {
-          newPillarLevel++;
-          remainingXp = newPillarXp - xpForNextLevel;
+          if (pillarData) {
+            // Only add XP if pillar is active
+            if (pillarData.is_active !== false) {
+              const newPillarXp = pillarData.current_xp + quest.challenge.xp_reward;
+              const xpForNextLevel = pillarData.level * 100;
+              let newPillarLevel = pillarData.level;
+              let remainingXp = newPillarXp;
+
+              if (newPillarXp >= xpForNextLevel) {
+                newPillarLevel++;
+                remainingXp = newPillarXp - xpForNextLevel;
+              }
+
+              await supabase
+                .from('user_pillars')
+                .update({
+                  current_xp: remainingXp,
+                  level: newPillarLevel,
+                  challenges_completed: pillarData.challenges_completed + 1,
+                })
+                .eq('user_id', user.id)
+                .eq('pillar_id', quest.challenge.pillar_id);
+            } else {
+              // Inactive pillar: store XP for later
+              await supabase
+                .from('user_pillars')
+                .update({
+                  inactive_xp: (pillarData as any).inactive_xp || 0 + quest.challenge.xp_reward,
+                  challenges_completed: pillarData.challenges_completed + 1,
+                })
+                .eq('user_id', user.id)
+                .eq('pillar_id', quest.challenge.pillar_id);
+            }
+          }
         }
-
-        await supabase
-          .from('user_pillars')
-          .update({
-            current_xp: remainingXp,
-            level: newPillarLevel,
-            challenges_completed: pillarData.challenges_completed + 1,
-          })
-          .eq('user_id', user.id)
-          .eq('pillar_id', quest.challenge.pillar_id);
+      } catch (xpError) {
+        console.warn('Error updating pillar XP:', xpError);
       }
 
       Alert.alert(
-        'Quest Complete! 🎉',
+        t('Quest Complete! 🎉', '¡Quest Completada! 🎉'),
         `+${quest.challenge.xp_reward} XP | +${quest.challenge.coin_reward} 🪙`,
-        [{ text: 'Awesome!' }]
+        [{ text: t('Awesome!', '¡Genial!') }]
       );
 
       fetchDailyQuests();
     } catch (error) {
       console.error('Error completing quest:', error);
-      Alert.alert('Error', 'Failed to complete quest');
+      Alert.alert(t('Error', 'Error'), t('Failed to complete quest', 'Error al completar la quest'));
     }
   };
 
@@ -357,9 +494,9 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
       {/* Header - hide when embedded */}
       {!embedded && (
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Daily Quests</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('Daily Quests', 'Quests Diarias')}</Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          {new Date().toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </Text>
       </View>
       )}
@@ -370,10 +507,10 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
           <Text style={styles.robotEmoji}>🤖</Text>
           <View style={styles.progressInfo}>
             <Text style={[styles.progressTitle, { color: theme.text }]}>
-              Today's Progress
+              {t("Today's Progress", 'Progreso de Hoy')}
             </Text>
             <Text style={[styles.progressCount, { color: theme.textSecondary }]}>
-              {completedCount} / {dailyQuests.length} quests completed
+              {completedCount} / {dailyQuests.length} {t('quests completed', 'quests completadas')}
             </Text>
           </View>
           {completedCount === dailyQuests.length && dailyQuests.length > 0 && (
@@ -393,28 +530,45 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
         </View>
         {completedCount === dailyQuests.length && dailyQuests.length > 0 && (
           <Text style={[styles.bonusText, { color: '#22C55E' }]}>
-            🎉 All daily quests complete! Bonus: +50 XP
+            🎉 {t('All daily quests complete! Bonus: +50 XP', '¡Todas las quests completadas! Bonus: +50 XP')}
           </Text>
         )}
       </View>
+
+      {/* Add Positive Activity Button */}
+      <TouchableOpacity
+        style={[styles.addActivityButton, { backgroundColor: theme.primary + '15', borderColor: theme.primary }]}
+        onPress={() => setShowAddActivityModal(true)}
+      >
+        <Text style={styles.addActivityEmoji}>⭐</Text>
+        <View style={styles.addActivityTextContainer}>
+          <Text style={[styles.addActivityTitle, { color: theme.primary }]}>
+            {t('Add Positive Activity', 'Agregar Actividad Positiva')}
+          </Text>
+          <Text style={[styles.addActivitySubtitle, { color: theme.textSecondary }]}>
+            {t('Did something great? Log it and earn XP!', '¿Hiciste algo genial? ¡Regístralo y gana XP!')}
+          </Text>
+        </View>
+        <Text style={[styles.addActivityArrow, { color: theme.primary }]}>›</Text>
+      </TouchableOpacity>
 
       {/* Mood Picker Modal */}
       {showMoodPicker && (
         <View style={[styles.moodPickerOverlay]}>
           <View style={[styles.moodPickerCard, { backgroundColor: theme.card }]}>
             <Text style={[styles.moodPickerTitle, { color: theme.text }]}>
-              ¿Cómo te sientes hoy? 🤔
+              {t('How are you feeling today? 🤔', '¿Cómo te sientes hoy? 🤔')}
             </Text>
             <Text style={[styles.moodPickerSubtitle, { color: theme.textSecondary }]}>
-              Esto ayuda a la IA a personalizar tus quests
+              {t('This helps the AI personalize your quests', 'Esto ayuda a la IA a personalizar tus quests')}
             </Text>
             <View style={styles.moodOptions}>
               {[
-                { mood: 'great', emoji: '😄', label: 'Genial' },
-                { mood: 'good', emoji: '😊', label: 'Bien' },
-                { mood: 'okay', emoji: '😐', label: 'Normal' },
-                { mood: 'bad', emoji: '😔', label: 'Mal' },
-                { mood: 'terrible', emoji: '😢', label: 'Terrible' },
+                { mood: 'great', emoji: '😄', labelEn: 'Great', labelEs: 'Genial' },
+                { mood: 'good', emoji: '😊', labelEn: 'Good', labelEs: 'Bien' },
+                { mood: 'okay', emoji: '😐', labelEn: 'Okay', labelEs: 'Normal' },
+                { mood: 'bad', emoji: '😔', labelEn: 'Bad', labelEs: 'Mal' },
+                { mood: 'terrible', emoji: '😢', labelEn: 'Terrible', labelEs: 'Terrible' },
               ].map((option) => (
                 <TouchableOpacity
                   key={option.mood}
@@ -427,7 +581,7 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
                   disabled={generatingAI}
                 >
                   <Text style={styles.moodEmoji}>{option.emoji}</Text>
-                  <Text style={[styles.moodLabel, { color: theme.text }]}>{option.label}</Text>
+                  <Text style={[styles.moodLabel, { color: theme.text }]}>{language === 'es' ? option.labelEs : option.labelEn}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -435,7 +589,7 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
               <View style={styles.generatingContainer}>
                 <ActivityIndicator size="small" color={theme.primary} />
                 <Text style={[styles.generatingText, { color: theme.textSecondary }]}>
-                  🤖 Generando quests personalizados...
+                  🤖 {t('Generating personalized quests...', 'Generando quests personalizados...')}
                 </Text>
               </View>
             )}
@@ -445,7 +599,7 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
               disabled={generatingAI}
             >
               <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>
-                Cancelar
+                {t('Cancel', 'Cancelar')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -464,7 +618,7 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
           ) : (
             <>
               <Text style={styles.generateButtonEmoji}>🤖</Text>
-              <Text style={styles.generateButtonText}>Generar Quests con IA</Text>
+              <Text style={styles.generateButtonText}>{t('Generate AI Quests', 'Generar Quests con IA')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -479,7 +633,7 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
         >
           <Text style={styles.regenerateEmoji}>🔄</Text>
           <Text style={[styles.regenerateText, { color: theme.primary }]}>
-            Regenerar con IA
+            {t('Regenerate with AI', 'Regenerar con IA')}
           </Text>
         </TouchableOpacity>
       )}
@@ -592,10 +746,10 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
           <View style={[styles.emptyState, { backgroundColor: theme.surface }]}>
             <Text style={styles.emptyEmoji}>📋</Text>
             <Text style={[styles.emptyTitle, { color: theme.text }]}>
-              No Daily Quests Yet
+              {t('No Daily Quests Yet', 'Sin Quests Diarias Aún')}
             </Text>
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-              Daily quests will appear here. Make sure the database is set up!
+              {t('Daily quests will appear here. Make sure the database is set up!', 'Las quests diarias aparecerán aquí. ¡Asegúrate de que la base de datos esté configurada!')}
             </Text>
           </View>
         )}
@@ -626,6 +780,46 @@ export const DailyQuestsScreen: React.FC<DailyQuestsProps> = ({ embedded = false
             // TODO: Implement skip logic
             setShowQuestDetail(false);
             fetchDailyQuests();
+          }
+        }}
+      />
+
+      {/* Quest AI Proactive Message Toast */}
+      <QuestAIToast 
+        message={aiMessage} 
+        onDismiss={() => setAiMessage(null)}
+        duration={4000}
+      />
+
+      {/* Add Positive Activity Modal */}
+      <AddPositiveActivityModal
+        visible={showAddActivityModal}
+        onClose={() => setShowAddActivityModal(false)}
+        onSuccess={async (activityData) => {
+          // Refresh the quests list to show the new activity
+          await fetchDailyQuests();
+
+          // Generate AI message celebrating the positive activity
+          if (activityData) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              try {
+                const message = await ProactiveAI.generateProactiveMessage({
+                  type: 'quest_complete',
+                  userId: user.id,
+                  data: {
+                    questTitle: activityData.title,
+                    xpEarned: activityData.xpEarned,
+                    isPositiveActivity: true,
+                  },
+                });
+                if (message) {
+                  setAiMessage(message);
+                }
+              } catch (error) {
+                console.error('Error generating AI message for positive activity:', error);
+              }
+            }
           }
         }}
       />
@@ -936,5 +1130,34 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  addActivityButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  addActivityEmoji: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  addActivityTextContainer: {
+    flex: 1,
+  },
+  addActivityTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  addActivitySubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  addActivityArrow: {
+    fontSize: 32,
+    fontWeight: '300',
   },
 });

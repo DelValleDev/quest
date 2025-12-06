@@ -55,12 +55,40 @@ export interface DailyPlan {
 const QUEST_COACH_SYSTEM_PROMPT = `You are Quest, a personal development AI coach in a gamified self-improvement app. 
 
 Your personality:
-- Supportive but not so soft - you push users to grow
-- Use emojis naturally but not excessively
-- Speak directly to the user (you, your)
-- Be concise - mobile app, not essays
-- Celebrate wins, acknowledge struggles
-- Give actionable advice, not generic platitudes
+- Fun and engaging - NOT like a boring AI assistant
+- Supportive but you push users to grow when needed
+- Use emojis naturally (but don't overdo it)
+- Be conversational and friendly, like a cool friend who's also a coach
+- Celebrate wins enthusiastically, acknowledge struggles with empathy
+- Give SPECIFIC actionable advice, not generic platitudes
+- ASK QUESTIONS often to understand the user better - the more you know, the better you help
+- Be curious about their life, dreams, challenges, and habits
+
+CONVERSATION STYLE:
+- Keep responses concise (it's a mobile app)
+- Ask follow-up questions to dig deeper
+- Reference specific things you know about them
+- Make jokes occasionally when appropriate
+- Be real - don't be fake positive all the time
+- If they share something personal, acknowledge it genuinely
+
+CRITICAL - ASK MORE QUESTIONS:
+- In your FIRST conversation with a user, ask 2-3 deep questions about their life, dreams, and struggles
+- Don't just answer - ALWAYS include at least one follow-up question in your responses
+- Questions should be:
+  * Specific to what they're working on
+  * Help you understand their WHY (motivation)
+  * Uncover obstacles or patterns
+  * Build deeper connection
+- Examples: "What made you choose this goal?", "What's been the hardest part?", "How would achieving this change your life?", "What happens if you don't do this?"
+
+LEARNING SYSTEM:
+- You have a "WHAT I'VE LEARNED ABOUT YOU" section in the context
+- This stores important information about the user (motivations, obstacles, dreams, fears, preferences, etc.)
+- Use this information to personalize your responses and make connections
+- The system automatically extracts learnings from conversations
+- Reference what you've learned: "I remember you mentioned...", "Based on what you told me about..."
+- The more conversations, the better you know them - use that knowledge!
 
 You have FULL ACCESS to the user's data:
 - Personality assessment scores (6 pillars: physical, mental, social, professional, spiritual, creative)
@@ -70,21 +98,55 @@ You have FULL ACCESS to the user's data:
 - ALL their Habits and completion history
 - ALL their Quests (daily challenges) - completed and pending
 - Their entire profile and progress
+- Previous conversations (use chat history to build continuity)
 
-YOU CAN:
-1. View and analyze ALL their data
-2. Create new Life Paths, Habits, and Quests
-3. Modify existing Life Paths, Habits, and Quests
-4. Delete or archive Life Paths, Habits, and Quests
-5. Provide insights based on their complete history
+YOUR SUPERPOWERS:
+1. View and analyze ALL their data to give personalized advice
+2. Create Life Paths, Habits, and Quests tailored to what they need
+3. Identify patterns, weaknesses, and strengths in their behavior
+4. Create quests that address BAD HABITS or things they need to CHANGE
+5. Be proactive - suggest things before they ask
+6. You have COMPLETE visibility into their bad habits, including:
+   - What the bad habit is (with description)
+   - How often they do it (occurrences)
+   - When they last did it
+   - Recent activity patterns (last 7/30 days)
+   - Notes they've written about it
 
-Your job:
-1. Generate personalized daily quests based on their weak areas and goals
-2. Provide motivation and accountability
-3. Answer questions about habits, productivity, wellness
-4. Help them plan their day/week
-5. Celebrate achievements and support through failures
-6. PROACTIVELY manage their Life Paths, Habits, and Quests based on conversation
+CRITICAL - DEEP BAD HABIT CONTEXT:
+You have access to EVERYTHING about their bad habits. Use this to create TARGETED quests:
+
+Example 1 - Pornography/Fap Addiction:
+If they track "pornography" or "fap" as a bad habit, create quests like:
+- "Delete all social media apps that trigger you for 3 days"
+- "Unfollow all Instagram models/OnlyFans accounts you follow"
+- "Install a website blocker (Freedom, Cold Turkey) and block 5 trigger sites"
+- "When you feel the urge, do 20 pushups instead - track it"
+- "Write a letter to your future self about why you want to quit"
+- "Call an accountability partner when you feel tempted"
+
+Example 2 - Social Media Addiction:
+If they track "scrolling Instagram/TikTok", create quests like:
+- "Delete TikTok from your phone for 48 hours"
+- "Set screen time limits: 30min/day for Instagram"
+- "Unfollow 20 accounts that make you feel bad about yourself"
+- "Post your screen time stats in your accountability group"
+
+Example 3 - Junk Food/Eating:
+If they track "eating junk food", create quests like:
+- "Remove all junk food from your house - donate or throw it away"
+- "Meal prep 3 healthy meals for tomorrow"
+- "When you crave junk food, drink water and wait 10 minutes first"
+
+IMPORTANT - PERSONALIZED QUESTS:
+When creating quests, make them SPECIFIC to:
+1. Their EXACT bad habit (not generic "be better")
+2. Their Life Path goals (connect the quest to their bigger vision)
+3. Their recent patterns (if they relapsed 3 times this week, address it)
+4. Their triggers and context (if they mentioned stress triggers it, address stress)
+
+Example: If user has Life Path "Become spiritually strong" + Bad Habit "watch porn", create:
+"Spend 30 minutes in prayer/meditation asking for strength to overcome your struggles"
 
 Always respond in the user's language (Spanish if they write in Spanish).
 When the user asks about their progress or goals, reference their ACTUAL Life Paths, Habits, and Quests.`;
@@ -98,6 +160,16 @@ Given the user's profile, generate personalized daily challenges that:
 4. Have clear completion criteria
 5. Fit their schedule and lifestyle
 
+DIFFICULTY RULES (IMPORTANT - based on time/effort required):
+- "easy": 5-10 minutes, minimal effort (quick tasks, simple habits)
+- "medium": 15-30 minutes, moderate effort (focused work, meaningful activities)  
+- "hard": 30-60+ minutes, significant effort (deep work, challenging goals)
+
+XP REWARDS based on difficulty:
+- easy: 10-20 XP, 2-5 coins
+- medium: 25-35 XP, 6-10 coins
+- hard: 40-60 XP, 12-20 coins
+
 For each quest, explain WHY you chose it based on their profile.
 
 Return JSON format only, no markdown:
@@ -108,8 +180,8 @@ Return JSON format only, no markdown:
       "description": "What to do specifically",
       "pillar_id": "physical|mental|social|professional|spiritual|creative",
       "difficulty": "easy|medium|hard",
-      "xp_reward": 15-50,
-      "coin_reward": 3-15,
+      "xp_reward": 10-60,
+      "coin_reward": 2-20,
       "duration_minutes": 5-60,
       "icon": "emoji",
       "why_this_quest": "Personal explanation of why this helps THEM"
@@ -287,6 +359,11 @@ You can create, modify, or delete any of these items based on the conversation.`
   // Save conversation to database
   await saveConversation(userId, message, finalResponse);
 
+  // Extract and save learnings from this conversation (async, non-blocking)
+  extractAndSaveLearnings(userId, message, finalResponse).catch((error) =>
+    console.error("Error extracting learnings:", error)
+  );
+
   return finalResponse;
 }
 
@@ -300,6 +377,14 @@ export async function generatePersonalizedQuests(
 ): Promise<DailyPlan> {
   const profile = await getUserProfileForAI(userId);
   const todaySchedule = await getUserCalendarEvents(userId);
+  const activePillars = await getActivePillars(userId);
+
+  // Filter pillar scores to only active ones for weakness detection
+  const activePillarScores = Object.fromEntries(
+    Object.entries(profile.pillar_scores).filter(([key]) =>
+      activePillars.includes(key)
+    )
+  );
 
   const prompt = `${QUEST_GENERATION_PROMPT}
 
@@ -309,8 +394,19 @@ USER PROFILE:
 - Level: ${profile.level}
 - Current streak: ${profile.current_streak} days
 - Pillar assessment scores (1-100): ${JSON.stringify(profile.pillar_scores)}
-- Weakest pillar: ${getWeakestPillar(profile.pillar_scores)}
+- Weakest pillar: ${getWeakestPillar(activePillarScores)}
 - Goals: ${profile.goals?.join(", ") || "Not set"}
+
+ACTIVE PILLARS (user is focusing on these):
+${activePillars.map((p) => `- ${p}`).join("\n")}
+
+INACTIVE PILLARS (user is NOT focusing on these right now):
+${
+  ["physical", "mental", "social", "professional", "spiritual", "creative"]
+    .filter((p) => !activePillars.includes(p))
+    .map((p) => `- ${p}`)
+    .join("\n") || "- None (all active)"
+}
 
 TODAY'S CONTEXT:
 - Mood: ${mood || "not specified"}
@@ -323,11 +419,13 @@ TODAY'S CONTEXT:
       : "No events"
   }
 
-Generate 5-7 quests:
-- 2-3 for their WEAKEST pillar
-- 2 for their CLASS focus
-- 1-2 for balance in other areas
+QUEST DISTRIBUTION (IMPORTANT):
+- 80% of quests MUST be from ACTIVE PILLARS (${activePillars.join(", ")})
+- 20% can be from inactive pillars for balance (optional, max 1-2 quests)
+- If user has only 1-2 active pillars, focus ALL quests on those
+- Inactive pillar quests should be simple/easy to not overwhelm
 
+Generate 5-7 quests following this distribution strictly.
 Make them SPECIFIC to their profile, not generic.`;
 
   const messages: CoachMessage[] = [
@@ -406,11 +504,44 @@ Respond in JSON format:
 // HELPER FUNCTIONS
 // =====================================================
 
+/**
+ * Get user's active pillars from database
+ */
+async function getActivePillars(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("user_pillars")
+    .select("pillar_id, is_active")
+    .eq("user_id", userId);
+
+  if (error || !data) {
+    // Default: all pillars active
+    return [
+      "physical",
+      "mental",
+      "social",
+      "professional",
+      "spiritual",
+      "creative",
+    ];
+  }
+
+  // Filter to only active pillars (default to true for backwards compat)
+  const active = data
+    .filter((p) => p.is_active !== false)
+    .map((p) => p.pillar_id);
+
+  // Return all pillars if none are marked active (backwards compat)
+  return active.length > 0
+    ? active
+    : ["physical", "mental", "social", "professional", "spiritual", "creative"];
+}
+
 async function getUserProfileForAI(userId: string): Promise<UserProfile> {
+  // Only select columns that exist in the database
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, display_name, user_class, level, total_xp, current_streak, pillar_scores, goals, personality_traits"
+      "id, display_name, user_class, level, total_xp, current_streak, pillar_scores"
     )
     .eq("id", userId)
     .single();
@@ -432,13 +563,14 @@ async function getUserProfileForAI(userId: string): Promise<UserProfile> {
       spiritual: 50,
       creative: 50,
     },
-    goals: data.goals || [],
-    personality_traits: data.personality_traits || [],
+    goals: [],
+    personality_traits: [],
   };
 }
 
 /**
- * Get COMPLETE user context for AI (Life Paths, Habits, Quests)
+ * Get COMPLETE user context for AI (Life Paths, Habits, Quests, Achievements, Guilds, etc.)
+ * The AI should know EVERYTHING about the user
  */
 async function getCompleteUserContext(userId: string): Promise<string> {
   const profile = await getUserProfileForAI(userId);
@@ -459,13 +591,33 @@ async function getCompleteUserContext(userId: string): Promise<string> {
 
   // Fetch Active Habits
   const { data: habits } = await supabase
-    .from("habits")
+    .from("user_habits")
     .select(
-      "id, title, description, pillar_id, frequency, current_streak, times_per_day"
+      "id, name, description, target_pillar, frequency, current_streak, best_streak, total_completions"
     )
     .eq("user_id", userId)
     .eq("is_active", true)
     .order("current_streak", { ascending: false });
+
+  // Fetch Bad Habits with recent logs
+  const { data: badHabits } = await supabase
+    .from("bad_habits")
+    .select(
+      "id, habit_name, description, qc_penalty, occurrences, last_occurred_at, created_at"
+    )
+    .eq("user_id", userId)
+    .order("occurrences", { ascending: false });
+
+  // Fetch recent bad habit logs (last 30 days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const { data: badHabitLogs } = await supabase
+    .from("bad_habit_logs")
+    .select("bad_habit_id, qc_lost, notes, created_at")
+    .eq("user_id", userId)
+    .gte("created_at", thirtyDaysAgo.toISOString())
+    .order("created_at", { ascending: false })
+    .limit(20);
 
   // Fetch Today's Quests
   const today = new Date().toISOString().split("T")[0];
@@ -480,38 +632,122 @@ async function getCompleteUserContext(userId: string): Promise<string> {
     .eq("user_id", userId)
     .eq("assigned_date", today);
 
-  // Build context string
-  let context = `USER PROFILE:
-- Name: ${profile.display_name}
-- Class: ${profile.user_class}
-- Level: ${profile.level} (${profile.total_xp} XP)
-- Current Streak: ${profile.current_streak} days 🔥
-- Pillar Scores: ${JSON.stringify(profile.pillar_scores)}
-- Weakest Pillar: ${getWeakestPillar(profile.pillar_scores)}
-- Strongest Pillar: ${getStrongestPillar(profile.pillar_scores)}
+  // Fetch Unlocked Achievements
+  const { data: achievements } = await supabase
+    .from("achievement_logs")
+    .select(
+      `
+      id, unlocked_at,
+      achievements(id, name, description, category, rarity, xp_reward, icon)
+    `
+    )
+    .eq("user_id", userId)
+    .order("unlocked_at", { ascending: false })
+    .limit(20);
 
-LIFE PATHS (Long-term Goals):
+  // Fetch User Pillars with levels
+  const { data: userPillars } = await supabase
+    .from("user_pillars")
+    .select("pillar_id, level, current_xp, is_active, priority, inactive_xp")
+    .eq("user_id", userId)
+    .order("priority", { ascending: true });
+
+  // Fetch Guild memberships
+  const { data: guildMemberships } = await supabase
+    .from("guild_members")
+    .select(
+      `
+      role, joined_at,
+      guilds(id, name, description, member_count)
+    `
+    )
+    .eq("user_id", userId);
+
+  // Fetch User Streaks
+  const { data: streaks } = await supabase
+    .from("user_streaks")
+    .select("streak_type, current_streak, longest_streak, last_activity_date")
+    .eq("user_id", userId);
+
+  // Fetch recent chat history (last 10 messages for context)
+  const { data: chatHistory } = await supabase
+    .from("chat_history")
+    .select("message, is_user, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  // Fetch Weekly Review if exists
+  const weekStart = getWeekStart();
+  const { data: weeklyReview } = await supabase
+    .from("weekly_reviews")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("week_start", weekStart)
+    .single();
+
+  // Fetch User Context Learnings (what AI has learned about the user)
+  const { data: userLearningsData } = await supabase.rpc(
+    "get_user_context_for_ai",
+    { p_user_id: userId }
+  );
+  const userLearnings = userLearningsData?.[0]?.context || {};
+
+  // Build comprehensive context string
+  let context = `=== COMPLETE USER PROFILE ===
+Name: ${profile.display_name}
+Class: ${profile.user_class}
+Level: ${profile.level} (${profile.total_xp} XP total)
+Daily Streak: ${profile.current_streak} days 🔥
+
+=== PILLAR LEVELS & FOCUS ===
+${
+  userPillars && userPillars.length > 0
+    ? userPillars
+        .map(
+          (p: any) =>
+            `• ${p.pillar_id.toUpperCase()}: Level ${p.level} (${
+              p.current_xp
+            } XP) ${
+              p.is_active
+                ? "✅ Active"
+                : `❌ Inactive (${p.inactive_xp} XP pending)`
+            }`
+        )
+        .join("\n")
+    : `Pillar Scores: ${JSON.stringify(profile.pillar_scores)}`
+}
+Active Pillars (user is focusing on): ${
+    userPillars
+      ?.filter((p: any) => p.is_active)
+      .map((p: any) => p.pillar_id)
+      .join(", ") || "All"
+  }
+Weakest Pillar: ${getWeakestPillar(profile.pillar_scores)}
+Strongest Pillar: ${getStrongestPillar(profile.pillar_scores)}
+
+=== LIFE PATHS (Long-term Goals) ===
 ${
   lifePaths && lifePaths.length > 0
     ? lifePaths
         .map(
           (lp: any) => `
-  • ${lp.title} (${lp.pillar_id}) - ${lp.progress_percentage || 0}% complete
-    Vision: ${lp.vision_statement || "N/A"}
-    Status: ${lp.status}
-    Target: ${lp.target_date || "Not set"}
-    Milestones:
+• ${lp.title} (${lp.pillar_id}) - ${lp.progress_percentage || 0}% complete
+  Vision: ${lp.vision_statement || "N/A"}
+  Why Important: ${lp.why_important || "N/A"}
+  Target Date: ${lp.target_date || "Not set"}
+  Milestones:
 ${
   lp.path_milestones && lp.path_milestones.length > 0
     ? lp.path_milestones
         .map(
           (m: any) =>
-            `      - ${m.title} (${m.status})${
-              m.completed_date ? ` ✅ Completed: ${m.completed_date}` : ""
+            `    - ${m.title} (${m.status})${
+              m.completed_date ? " ✅ " + m.completed_date : ""
             }`
         )
         .join("\n")
-    : "      (No milestones yet)"
+    : "    (No milestones yet)"
 }
 `
         )
@@ -519,39 +755,385 @@ ${
     : "(No Life Paths created yet)"
 }
 
-ACTIVE HABITS:
+=== ACTIVE HABITS (Positive) ===
 ${
   habits && habits.length > 0
     ? habits
         .map(
           (h: any) => `
-  • ${h.title} (${h.pillar_id}) - ${h.frequency}, ${h.times_per_day}x/day
-    Streak: ${h.current_streak} days 🔥
-    ${h.description || ""}
-`
+• ${h.name} (${h.target_pillar || "general"}) - ${h.frequency}
+  Current Streak: ${h.current_streak} days 🔥 | Best: ${h.best_streak} days
+  Total Completions: ${h.total_completions}
+  ${h.description || ""}`
         )
         .join("\n")
     : "(No active habits)"
 }
 
-TODAY'S QUESTS:
+=== BAD HABITS (Things to ELIMINATE) ===
+${
+  badHabits && badHabits.length > 0
+    ? badHabits
+        .map((bh: any) => {
+          const recentLogs =
+            badHabitLogs?.filter((log: any) => log.bad_habit_id === bh.id) ||
+            [];
+          const last7Days = recentLogs.filter((log: any) => {
+            const logDate = new Date(log.created_at);
+            const now = new Date();
+            const diffDays = Math.floor(
+              (now.getTime() - logDate.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            return diffDays <= 7;
+          });
+
+          return `
+• ⚠️ ${bh.habit_name} - QC Penalty: ${bh.qc_penalty}
+  ${bh.description ? `Description: ${bh.description}` : ""}
+  Total Occurrences: ${bh.occurrences}
+  Last Occurred: ${
+    bh.last_occurred_at
+      ? new Date(bh.last_occurred_at).toLocaleDateString()
+      : "Never"
+  }
+  Recent Activity (last 7 days): ${last7Days.length} times
+  ${
+    last7Days.length > 0
+      ? `  Recent Notes:\n${last7Days
+          .slice(0, 3)
+          .map(
+            (log: any) =>
+              `    - ${log.notes || "No notes"} (${new Date(
+                log.created_at
+              ).toLocaleDateString()})`
+          )
+          .join("\n")}`
+      : ""
+  }`;
+        })
+        .join("\n")
+    : "(No bad habits tracked - which is GREAT! 🎉)"
+}
+
+CRITICAL - BAD HABITS AI COACHING:
+You have FULL visibility into the user's bad habits. Use this to:
+1. Create SPECIFIC quests that help them break these habits
+   Example: If they struggle with "scrolling social media", create quests like:
+   - "Delete Instagram from your phone for 24 hours"
+   - "Use 30 minutes you'd spend on TikTok to read a book instead"
+   - "Unfollow 10 accounts that don't add value to your life"
+
+2. Ask DEEP QUESTIONS to understand the root cause:
+   - "What triggers you to [bad habit]?"
+   - "What need is this habit fulfilling?"
+   - "What would your life look like without this?"
+   - "What's the real cost of continuing this habit?"
+
+3. Suggest REPLACEMENT behaviors:
+   - Not just "stop doing X", but "do Y instead"
+   - Find healthier alternatives that meet the same need
+   
+4. Track patterns and celebrate progress:
+   - "I noticed you haven't logged [bad habit] in 5 days! What changed?"
+   - "You mentioned [trigger] - is that still happening?"
+
+5. Be REAL and empathetic, not judgmental:
+   - Bad habits are hard to break
+   - Relapse is part of recovery
+   - Focus on progress, not perfection
+
+=== TODAY'S QUESTS ===
 ${
   quests && quests.length > 0
     ? quests
         .map(
           (q: any) => `
-  • ${q.challenges?.title || "Unknown"} (${q.challenges?.pillar_id || "N/A"})
-    Status: ${q.status} ${q.status === "completed" ? "✅" : "⏳"}
-    ${q.challenges?.description || ""}
-`
+• ${q.challenges?.title || "Unknown"} (${q.challenges?.pillar_id || "N/A"})
+  Status: ${q.status} ${q.status === "completed" ? "✅" : "⏳"}
+  Difficulty: ${q.challenges?.difficulty || "N/A"} | XP: ${
+            q.challenges?.xp_reward || 0
+          }
+  ${q.challenges?.description || ""}`
         )
         .join("\n")
     : "(No quests assigned today)"
 }
 
-Today's date: ${new Date().toLocaleDateString("es-ES")}`;
+=== ACHIEVEMENTS UNLOCKED (${achievements?.length || 0} shown) ===
+${
+  achievements && achievements.length > 0
+    ? achievements
+        .map(
+          (a: any) => `
+• ${a.achievements?.icon || "🏆"} ${a.achievements?.name} (${
+            a.achievements?.rarity
+          })
+  ${a.achievements?.description}
+  Unlocked: ${new Date(a.unlocked_at).toLocaleDateString()}`
+        )
+        .join("\n")
+    : "(No achievements unlocked yet)"
+}
+
+=== GUILDS & SOCIAL ===
+${
+  guildMemberships && guildMemberships.length > 0
+    ? guildMemberships
+        .map(
+          (g: any) => `
+• ${g.guilds?.name} (${g.role})
+  ${g.guilds?.description || ""}
+  Members: ${g.guilds?.member_count || 0}`
+        )
+        .join("\n")
+    : "(Not a member of any guild)"
+}
+
+=== STREAKS ===
+${
+  streaks && streaks.length > 0
+    ? streaks
+        .map(
+          (s: any) => `
+• ${s.streak_type}: ${s.current_streak} days (Best: ${s.longest_streak})`
+        )
+        .join("\n")
+    : `Daily Streak: ${profile.current_streak} days`
+}
+
+=== THIS WEEK'S REVIEW ===
+${
+  weeklyReview
+    ? `Goals Set: ${weeklyReview.goals_count || 0}
+Quests Completed: ${weeklyReview.quests_completed || 0}
+XP Earned: ${weeklyReview.xp_earned || 0}
+Focus: ${weeklyReview.focus_areas || "N/A"}`
+    : "(No weekly review yet)"
+}
+
+=== WHAT I'VE LEARNED ABOUT YOU ===
+${
+  Object.keys(userLearnings).length > 0
+    ? Object.entries(userLearnings)
+        .map(([category, items]: [string, any]) => {
+          if (!items || Object.keys(items).length === 0) return "";
+          return `${category.toUpperCase()}:\n${Object.entries(items)
+            .map(([key, value]: [string, any]) => `  • ${key}: ${value}`)
+            .join("\n")}`;
+        })
+        .filter((x) => x)
+        .join("\n\n")
+    : "(I'm still getting to know you - this is why I ask questions!)"
+}
+
+=== EXTERNAL INTEGRATIONS & ACTIVITY DATA ===
+${await getIntegrationsContext(userId)}
+
+=== RECENT CONVERSATION CONTEXT ===
+${
+  chatHistory && chatHistory.length > 0
+    ? chatHistory
+        .reverse()
+        .map(
+          (c: any) =>
+            `${c.is_user ? "User" : "AI"}: ${c.message.substring(0, 100)}...`
+        )
+        .join("\n")
+    : "(New conversation)"
+}
+
+Today's Date: ${new Date().toLocaleDateString("es-ES", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })}
+Current Time: ${new Date().toLocaleTimeString("es-ES")}`;
 
   return context;
+}
+
+/**
+ * Get integrations context for AI
+ * - Connected apps (Strava, Spotify, GitHub, etc.)
+ * - Recent activities synced
+ * - Patterns and insights from external data
+ */
+async function getIntegrationsContext(userId: string): Promise<string> {
+  // Fetch active integrations
+  const { data: integrations } = await supabase
+    .from("user_integrations")
+    .select("integration_type, is_active, last_synced_at, metadata")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (!integrations || integrations.length === 0) {
+    return `No external integrations connected.
+
+💡 TIP FOR AI: Suggest connecting relevant integrations based on their goals:
+- If they have physical pillar goals → suggest Strava or Apple Health
+- If they mention coding/dev work → suggest GitHub
+- If they struggle with motivation → suggest Spotify (music mood tracking)`;
+  }
+
+  let context = `Connected Apps (${integrations.length}):\n`;
+
+  // Fetch recent activities from last 7 days
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const { data: recentActivities } = await supabase
+    .from("user_activity_imports")
+    .select(
+      "source, activity_type, distance_meters, duration_seconds, calories, date, metadata"
+    )
+    .eq("user_id", userId)
+    .gte("date", sevenDaysAgo.toISOString())
+    .order("date", { ascending: false })
+    .limit(20);
+
+  // Build context for each integration
+  for (const integration of integrations) {
+    const type = integration.integration_type;
+    const lastSynced = integration.last_synced_at
+      ? new Date(integration.last_synced_at).toLocaleDateString()
+      : "Never";
+
+    context += `\n• ${getIntegrationEmoji(type)} ${type.toUpperCase()}`;
+    context += `\n  Last synced: ${lastSynced}`;
+
+    // Add integration-specific insights
+    const activities =
+      recentActivities?.filter((a: any) => a.source === type) || [];
+
+    if (activities.length > 0) {
+      context += `\n  Recent activity (last 7 days): ${activities.length} events`;
+
+      if (type === "strava") {
+        const totalDistance = activities.reduce(
+          (sum: number, a: any) => sum + (a.distance_meters || 0),
+          0
+        );
+        const totalDuration = activities.reduce(
+          (sum: number, a: any) => sum + (a.duration_seconds || 0),
+          0
+        );
+        const totalCalories = activities.reduce(
+          (sum: number, a: any) => sum + (a.calories || 0),
+          0
+        );
+
+        context += `\n    - Total distance: ${(totalDistance / 1000).toFixed(
+          1
+        )}km`;
+        context += `\n    - Total time: ${Math.floor(
+          totalDuration / 60
+        )} minutes`;
+        context += `\n    - Calories burned: ${totalCalories}`;
+        context += `\n    - Activities: ${activities
+          .slice(0, 3)
+          .map((a: any) => a.activity_type)
+          .join(", ")}`;
+      } else if (type === "spotify") {
+        const avgMood =
+          activities.reduce(
+            (sum: number, a: any) => sum + (a.metadata?.mood_score || 50),
+            0
+          ) / activities.length;
+        const avgEnergy =
+          activities.reduce(
+            (sum: number, a: any) => sum + (a.metadata?.energy_level || 50),
+            0
+          ) / activities.length;
+
+        context += `\n    - Average mood score: ${Math.round(avgMood)}/100 ${
+          avgMood < 40
+            ? "⚠️ (concerning - mostly sad music)"
+            : avgMood > 70
+            ? "✅ (uplifting!)"
+            : ""
+        }`;
+        context += `\n    - Average energy: ${Math.round(avgEnergy)}/100`;
+        context += `\n    - Total listening time: ${Math.floor(
+          activities.reduce(
+            (sum: number, a: any) => sum + (a.duration_seconds || 0),
+            0
+          ) / 60
+        )} minutes`;
+      } else if (type === "github") {
+        const totalCommits = activities.reduce(
+          (sum: number, a: any) => sum + (a.metadata?.commits_count || 0),
+          0
+        );
+        const totalPRs = activities.reduce(
+          (sum: number, a: any) => sum + (a.metadata?.prs_opened || 0),
+          0
+        );
+
+        context += `\n    - Total commits: ${totalCommits}`;
+        context += `\n    - PRs opened: ${totalPRs}`;
+        context += `\n    - Active repos: ${
+          activities[0]?.metadata?.repos?.join(", ") || "N/A"
+        }`;
+      }
+    } else {
+      context += `\n  ⚠️ No activity detected in last 7 days`;
+    }
+  }
+
+  // Add AI coaching tips based on integration data
+  context += `\n\nCRITICAL - HOW TO USE INTEGRATION DATA:
+
+1. CREATE TARGETED QUESTS based on their activity:
+   - If Strava shows they run regularly → "Beat your 5km PR"
+   - If GitHub shows coding daily → "Refactor one messy function today"
+   - If Spotify mood is low → "Listen to 30 minutes of uplifting music"
+
+2. DETECT PATTERNS AND RED FLAGS:
+   - Strava: 0 workouts for 7 days → "What's blocking you from exercising?"
+   - Spotify: Mood score < 40 for 3+ days → "Your music suggests you're struggling. Want to talk?"
+   - GitHub: 0 commits for 3+ days (when usually active) → "Let's break that coding freeze"
+
+3. CELEBRATE WINS:
+   - Strava: New distance PR → "You crushed that run! 🏃‍♂️"
+   - GitHub: High commit streak → "You're on fire with coding! 💻"
+   - Spotify: Mood improved → "Love seeing your music choices getting more uplifting!"
+
+4. AUTO-COMPLETION AWARENESS:
+   - When they sync Strava, habits like "exercise" auto-complete
+   - They might not manually log, but data proves they did it
+   - Acknowledge: "I see you knocked out that workout! (auto-detected from Strava)"
+
+5. PERSONALIZED RECOMMENDATIONS:
+   - If they have NO integrations but mention fitness → suggest Strava
+   - If they mention music/mood → suggest Spotify
+   - If they're a developer → suggest GitHub`;
+
+  return context;
+}
+
+/**
+ * Get emoji for integration type
+ */
+function getIntegrationEmoji(type: string): string {
+  const emojiMap: Record<string, string> = {
+    strava: "🏃",
+    spotify: "🎵",
+    github: "💻",
+    apple_health: "❤️",
+    google_fit: "🤖",
+    todoist: "✅",
+    google_calendar: "📅",
+    notion: "📝",
+  };
+  return emojiMap[type] || "🔗";
+}
+
+function getWeekStart(): string {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(now.setDate(diff)).toISOString().split("T")[0];
 }
 
 async function getUserCalendarEvents(
@@ -586,6 +1168,120 @@ async function saveConversation(
     user_message: userMessage,
     ai_response: aiResponse,
   });
+}
+
+/**
+ * Extract learnings from user messages and AI responses
+ * Looks for patterns that indicate important personal information
+ */
+async function extractAndSaveLearnings(
+  userId: string,
+  userMessage: string,
+  aiResponse: string
+) {
+  const learnings: Array<{
+    category: string;
+    key: string;
+    value: string;
+    confidence: number;
+  }> = [];
+
+  // Pattern matching for different types of learnings
+  const patterns = {
+    motivation: [
+      /(?:me motiva|me inspira|me impulsa|mi motivación es|quiero lograr)\s+(.+)/gi,
+      /(?:mi objetivo es|mi meta es|aspiro a|sueño con)\s+(.+)/gi,
+    ],
+    obstacle: [
+      /(?:mi problema es|tengo dificultad|me cuesta|el obstáculo es)\s+(.+)/gi,
+      /(?:no puedo|me bloquea|me impide|lucho con)\s+(.+)/gi,
+    ],
+    dream: [
+      /(?:mi sueño es|sueño con|me gustaría|algún día quiero)\s+(.+)/gi,
+      /(?:mi visión es|imagino que|aspiro a ser)\s+(.+)/gi,
+    ],
+    fear: [
+      /(?:me da miedo|temo que|me preocupa|tengo miedo de)\s+(.+)/gi,
+      /(?:me asusta|me aterra|pánico a)\s+(.+)/gi,
+    ],
+    preference: [
+      /(?:prefiero|me gusta más|disfruto|me encanta)\s+(.+)/gi,
+      /(?:odio|detesto|no me gusta|no soporto)\s+(.+)/gi,
+    ],
+  };
+
+  // Extract learnings from user message
+  for (const [category, regexList] of Object.entries(patterns)) {
+    for (const regex of regexList) {
+      const matches = [...userMessage.matchAll(regex)];
+      for (const match of matches) {
+        if (match[1] && match[1].length > 5) {
+          // Avoid very short captures
+          learnings.push({
+            category,
+            key: match[1].substring(0, 50).trim(), // First 50 chars as key
+            value: match[1].trim(),
+            confidence: 0.8,
+          });
+        }
+      }
+    }
+  }
+
+  // Look for explicit statements in user message
+  const explicitPatterns = [
+    {
+      regex: /trabajo (?:como|en|de)\s+(.+?)(?:\.|,|$)/gi,
+      category: "preference",
+      key: "occupation",
+    },
+    {
+      regex: /tengo\s+(\d+)\s+años/gi,
+      category: "preference",
+      key: "age",
+    },
+    {
+      regex: /vivo en\s+(.+?)(?:\.|,|$)/gi,
+      category: "preference",
+      key: "location",
+    },
+    {
+      regex: /mi familia\s+(.+?)(?:\.|,|$)/gi,
+      category: "preference",
+      key: "family_context",
+    },
+  ];
+
+  for (const pattern of explicitPatterns) {
+    const matches = [...userMessage.matchAll(pattern.regex)];
+    for (const match of matches) {
+      if (match[1]) {
+        learnings.push({
+          category: pattern.category,
+          key: pattern.key,
+          value: match[1].trim(),
+          confidence: 0.9,
+        });
+      }
+    }
+  }
+
+  // Save learnings to database
+  for (const learning of learnings) {
+    try {
+      await supabase.rpc("save_user_learning", {
+        p_user_id: userId,
+        p_category: learning.category,
+        p_key: learning.key,
+        p_value: learning.value,
+        p_confidence: learning.confidence,
+      });
+    } catch (error) {
+      console.error("Error saving learning:", error);
+    }
+  }
+
+  return learnings.length;
 }
 
 async function saveGeneratedQuests(userId: string, quests: GeneratedQuest[]) {
@@ -848,7 +1544,15 @@ export async function analyzeAssessmentWithAI(
   questions: AssessmentQuestion[],
   answers: Record<string, AssessmentAnswer>,
   userName?: string,
-  language: string = "es"
+  language: string = "es",
+  activePillars: string[] = [
+    "physical",
+    "mental",
+    "social",
+    "professional",
+    "spiritual",
+    "creative",
+  ]
 ): Promise<AssessmentAnalysis> {
   // Build a readable summary of Q&A
   const qaSummary = questions
@@ -875,9 +1579,23 @@ export async function analyzeAssessmentWithAI(
       ? "IMPORTANTE: Responde COMPLETAMENTE en español. Todos los textos, resúmenes, fortalezas, metas y mensajes deben estar en español."
       : "Respond in English.";
 
+  // Build pillar context for the AI
+  const pillarContext = `
+USER'S ACTIVE PILLARS (FOCUS AREAS):
+The user has chosen to focus on these life areas: ${activePillars.join(", ")}.
+
+IMPORTANT INSTRUCTIONS FOR GENERATION:
+- Generate Life Paths ONLY for the active pillars listed above.
+- Generate Habits primarily (80%) for active pillars, with occasional (20%) suggestions for other areas.
+- Generate initial quests mostly (80%) for active pillars, but some (20%) for other areas to encourage exploration.
+- Pillar scores should still be calculated for ALL 6 pillars based on assessment responses.
+`;
+
   const prompt = `You are analyzing a personality assessment for a gamified self-improvement app called Quest.
 
 ${langInstruction}
+
+${pillarContext}
 
 Based on these questions and answers, create a detailed analysis:
 
@@ -943,10 +1661,16 @@ Analyze this and return JSON with:
 }
 
 Generate:
-1. 5 initial quests targeting their weakest areas.
-2. 2 Life Paths (Long term goals) based on their aspirations. Make sure they are distinct and NOT generic.
+1. 5 initial quests: 4 for their ACTIVE PILLARS (weakest areas within those), 1 for a secondary pillar to encourage exploration.
+2. 2 Life Paths: BOTH must be for ACTIVE PILLARS ONLY. Make sure they are distinct and NOT generic. Pick from: ${activePillars.join(
+    ", "
+  )}.
 3. Each Life Path MUST have 3-5 sequential milestones (small steps to reach the goal).
-4. 3 Habits (some linked to Life Paths, some standalone for general wellbeing).
+4. 3 Habits: At least 2 for ACTIVE PILLARS, 1 can be for general wellbeing or secondary pillar.
+
+REMEMBER: Life Paths MUST be for active pillars only: ${activePillars.join(
+    ", "
+  )}.
 
 Be specific and personal - reference their actual answers.
 The welcome message should feel like a real coach who understands them.`;
@@ -1072,6 +1796,227 @@ function generateFallbackAnalysis(
 }
 
 // =====================================================
+// LIFE PATH EXPANSION WITH AI
+// =====================================================
+
+interface LifePathExpansion {
+  milestones: Array<{
+    title: string;
+    description: string;
+    target_date: string;
+  }>;
+  habits: Array<{
+    title: string;
+    description: string;
+    frequency: string;
+    times_per_day: number;
+  }>;
+  quests: Array<{
+    title: string;
+    description: string;
+    difficulty: "easy" | "medium" | "hard";
+    xp_reward: number;
+    coin_reward: number;
+    duration_minutes: number;
+    icon: string;
+  }>;
+}
+
+/**
+ * Expand a Life Path with AI-generated milestones, habits, and quests
+ * Called when a new Life Path is created (manually or by AI)
+ */
+export async function expandLifePathWithAI(
+  userId: string,
+  lifePathId: string,
+  pathTitle: string,
+  pathVision: string | null,
+  pillarId: string,
+  timeframeMonths: number = 6
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // Get user context for personalization
+    const userContext = await getCompleteUserContext(userId);
+
+    // Calculate intensity based on timeframe
+    const intensity =
+      timeframeMonths <= 3 ? "HIGH" : timeframeMonths <= 9 ? "MEDIUM" : "LOW";
+    const habitsCount =
+      timeframeMonths <= 3 ? "3-5" : timeframeMonths <= 9 ? "2-4" : "2-3";
+    const questsCount =
+      timeframeMonths <= 3 ? "5-7" : timeframeMonths <= 9 ? "3-5" : "3-4";
+
+    const prompt = `You are generating a complete action plan for a Life Path goal.
+
+LIFE PATH DETAILS:
+- Title: "${pathTitle}"
+- Vision: "${pathVision || "Not specified"}"
+- Pillar: ${pillarId}
+- Timeframe: ${timeframeMonths} months
+- Intensity: ${intensity} (shorter timeframe = higher intensity and frequency)
+
+USER CONTEXT:
+${userContext}
+
+Generate a PERSONALIZED action plan that includes:
+
+1. MILESTONES (4-6 steps to achieve this goal):
+   - Progressive steps from start to goal
+   - Specific, measurable achievements
+   - Spread evenly over the ${timeframeMonths}-month timeframe
+   - First milestone should be achievable within ${Math.ceil(
+     timeframeMonths / 6
+   )} month(s)
+
+2. HABITS (${habitsCount} daily/weekly habits):
+   - Habits that support achieving this goal
+   - Based on what you know about the user
+   - Should address user's weaknesses if relevant
+   - Frequency should match the ${intensity} intensity (shorter timeframe = higher frequency)
+   - For ${intensity} intensity: prefer daily habits with multiple times per day
+
+3. QUESTS (${questsCount} immediate actionable tasks):
+   - Specific tasks the user can do TODAY or THIS WEEK
+   - Based on user's current situation and what needs to change
+   - Include quests that address bad habits or behaviors
+   - Make them personal - reference things the AI knows about the user
+   - For ${intensity} intensity: create more challenging quests with higher XP rewards
+
+IMPORTANT FOR QUESTS:
+- Make quests that help the user CHANGE what needs to change
+- If user has bad habits or behaviors conflicting with their goal, create quests to address them
+- Be specific and personal, not generic
+- Example: If user wants spiritual growth but listens to inappropriate music, create a quest like "Spend 30 minutes removing songs that don't align with your values from your playlist"
+
+Return ONLY valid JSON (no markdown):
+{
+  "milestones": [
+    {"title": "...", "description": "...", "target_date": "YYYY-MM-DD"}
+  ],
+  "habits": [
+    {"title": "...", "description": "...", "frequency": "daily|weekly", "times_per_day": 1}
+  ],
+  "quests": [
+    {"title": "...", "description": "...", "difficulty": "easy|medium|hard", "xp_reward": 10-60, "coin_reward": 2-20, "duration_minutes": 5-60, "icon": "emoji"}
+  ]
+}`;
+
+    const messages: CoachMessage[] = [
+      { role: "system", content: prompt },
+      { role: "user", content: `Generate action plan for: "${pathTitle}"` },
+    ];
+
+    const response = await callOpenAI(messages, {
+      temperature: 0.7,
+      max_tokens: 2000,
+      json_mode: true,
+    });
+
+    const expansion: LifePathExpansion = JSON.parse(response);
+
+    // Save milestones
+    if (expansion.milestones && expansion.milestones.length > 0) {
+      const milestonesToInsert = expansion.milestones.map((m, index) => ({
+        life_path_id: lifePathId,
+        user_id: userId,
+        title: m.title,
+        description: m.description,
+        target_date: m.target_date,
+        sort_order: index,
+        status: "pending",
+        ai_suggested: true,
+      }));
+
+      await supabase.from("path_milestones").insert(milestonesToInsert);
+    }
+
+    // Save habits
+    if (expansion.habits && expansion.habits.length > 0) {
+      for (const habit of expansion.habits) {
+        // Create habit
+        const { data: habitData, error: habitError } = await supabase
+          .from("habits")
+          .insert({
+            user_id: userId,
+            title: habit.title,
+            description: habit.description,
+            pillar_id: pillarId,
+            frequency: habit.frequency,
+            times_per_day: habit.times_per_day,
+            is_active: true,
+            is_ai_suggested: true,
+          })
+          .select("id")
+          .single();
+
+        if (!habitError && habitData) {
+          // Link habit to life path
+          await supabase.from("path_habits").insert({
+            life_path_id: lifePathId,
+            user_id: userId,
+            habit_id: habitData.id,
+            title: habit.title,
+            description: habit.description,
+            pillar_id: pillarId,
+            frequency: habit.frequency,
+            target_per_period: habit.times_per_day,
+          });
+        }
+      }
+    }
+
+    // Save quests
+    if (expansion.quests && expansion.quests.length > 0) {
+      const today = new Date().toISOString().split("T")[0];
+
+      for (const quest of expansion.quests) {
+        // Create challenge
+        const { data: challenge, error: challengeError } = await supabase
+          .from("challenges")
+          .insert({
+            title: quest.title,
+            description: quest.description,
+            pillar_id: pillarId,
+            difficulty: quest.difficulty,
+            xp_reward: quest.xp_reward,
+            coin_reward: quest.coin_reward,
+            duration_minutes: quest.duration_minutes,
+            icon: quest.icon,
+            is_daily: false,
+            tags: ["ai_generated", "life_path", lifePathId],
+          })
+          .select("id")
+          .single();
+
+        if (!challengeError && challenge) {
+          // Assign to user
+          await supabase.from("user_daily_quests").insert({
+            user_id: userId,
+            daily_quest_id: challenge.id,
+            assigned_date: today,
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `✅ Created ${expansion.milestones?.length || 0} milestones, ${
+        expansion.habits?.length || 0
+      } habits, and ${
+        expansion.quests?.length || 0
+      } quests for your Life Path!`,
+    };
+  } catch (error) {
+    console.error("Error expanding Life Path:", error);
+    return {
+      success: false,
+      message: "Failed to generate action plan. Please try again.",
+    };
+  }
+}
+
+// =====================================================
 // SIMPLE TEXT GENERATION
 // =====================================================
 
@@ -1107,6 +2052,7 @@ export const questAI = {
   saveGeneratedHabits,
   analyzeAssessment: analyzeAssessmentWithAI,
   generateText,
+  expandLifePath: expandLifePathWithAI,
 };
 
 export default questAI;

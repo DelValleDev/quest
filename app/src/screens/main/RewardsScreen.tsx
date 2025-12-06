@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useThemeStore, useAuthStore } from "../../store";
+import { useThemeStore, useAuthStore, useLanguageStore } from "../../store";
 import { getTheme } from "../../theme/colors";
 import { AdsService, AD_REWARDS, type AdReward, type AdRewardStatus } from "../../lib/ads";
 import { LimitsService, FEATURE_IDS, type DailyLimits } from "../../lib/limits";
@@ -34,7 +34,11 @@ export const RewardsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { mode } = useThemeStore();
   const { user } = useAuthStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const [loading, setLoading] = useState(true);
   const [rewards, setRewards] = useState<RewardCard[]>([]);
@@ -117,15 +121,15 @@ export const RewardsScreen: React.FC = () => {
   const getRewardSubtitle = (reward: AdReward): string => {
     switch (reward.rewardType) {
       case "quest_coins":
-        return "Gana monedas viendo un anuncio";
+        return t("Earn coins by watching an ad", "Gana monedas viendo un anuncio");
       case "extra_duel":
-        return "Un duelo extra para hoy";
+        return t("An extra duel for today", "Un duelo extra para hoy");
       case "extra_ai_message":
-        return "Mensajes extra con la IA";
+        return t("Extra messages with AI", "Mensajes extra con la IA");
       case "streak_revive":
-        return "Recupera tu racha perdida";
+        return t("Recover your lost streak", "Recupera tu racha perdida");
       case "xp_boost":
-        return "Duplica tu XP por 1 hora";
+        return t("Double your XP for 1 hour", "Duplica tu XP por 1 hora");
       default:
         return "";
     }
@@ -136,11 +140,11 @@ export const RewardsScreen: React.FC = () => {
       case "quest_coins":
         return `+${reward.rewardAmount} QC`;
       case "extra_duel":
-        return `+${reward.rewardAmount} Duelo`;
+        return `+${reward.rewardAmount} ${t('Duel', 'Duelo')}`;
       case "extra_ai_message":
-        return `+${reward.rewardAmount} Mensajes`;
+        return `+${reward.rewardAmount} ${t('Messages', 'Mensajes')}`;
       case "streak_revive":
-        return "Revivir Racha";
+        return t("Revive Streak", "Revivir Racha");
       case "xp_boost":
         return `${reward.rewardAmount}min 2x XP`;
       default:
@@ -194,17 +198,17 @@ export const RewardsScreen: React.FC = () => {
 
       if (result.success) {
         Alert.alert(
-          "¡Recompensa Obtenida! 🎉",
-          `Has ganado tu recompensa.`,
-          [{ text: "¡Genial!" }]
+          t("Reward Obtained! 🎉", "¡Recompensa Obtenida! 🎉"),
+          t("You've earned your reward.", "Has ganado tu recompensa."),
+          [{ text: t("Great!", "¡Genial!") }]
         );
         // Reload data
         await loadData();
       } else {
-        Alert.alert("Error", result.error || "No se pudo obtener la recompensa");
+        Alert.alert(t("Error", "Error"), result.error || t("Could not get the reward", "No se pudo obtener la recompensa"));
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      Alert.alert(t("Error", "Error"), error.message);
     } finally {
       setWatchingAd(null);
     }
@@ -250,7 +254,7 @@ export const RewardsScreen: React.FC = () => {
             {reward.subtitle}
           </Text>
           <Text style={[styles.usageText, { color: theme.textSecondary }]}>
-            {usedToday}/{maxDaily} usados hoy
+            {usedToday}/{maxDaily} {t('used today', 'usados hoy')}
           </Text>
         </View>
 
@@ -274,7 +278,7 @@ export const RewardsScreen: React.FC = () => {
               <Text style={styles.cooldownText}>{formatCooldown(cooldown)}</Text>
             ) : (
               <Text style={styles.watchText}>
-                {isAvailable ? "Ver Ad" : "Agotado"}
+                {isAvailable ? t("Watch Ad", "Ver Ad") : t("Exhausted", "Agotado")}
               </Text>
             )}
           </TouchableOpacity>
@@ -294,7 +298,7 @@ export const RewardsScreen: React.FC = () => {
           <Text style={[styles.backIcon, { color: theme.text }]}>←</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.text }]}>
-          Recompensas Gratis
+          {t('Free Rewards', 'Recompensas Gratis')}
         </Text>
         <View style={styles.placeholder} />
       </View>
@@ -317,7 +321,7 @@ export const RewardsScreen: React.FC = () => {
             ]}
           >
             <Text style={[styles.statsTitle, { color: theme.text }]}>
-              Hoy has ganado
+              {t("Today you've earned", "Hoy has ganado")}
             </Text>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
@@ -330,7 +334,7 @@ export const RewardsScreen: React.FC = () => {
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{todayStats.totalAdsWatched}</Text>
                 <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                  Anuncios
+                  {t('Ads', 'Anuncios')}
                 </Text>
               </View>
             </View>
@@ -345,7 +349,7 @@ export const RewardsScreen: React.FC = () => {
               ]}
             >
               <Text style={[styles.limitsTitle, { color: theme.text }]}>
-                Tus límites de hoy
+                {t("Your limits for today", "Tus límites de hoy")}
               </Text>
               <View style={styles.limitsRow}>
                 <View style={styles.limitItem}>
@@ -354,7 +358,7 @@ export const RewardsScreen: React.FC = () => {
                     {dailyLimits.duelsRemaining}/{dailyLimits.duelsMax + dailyLimits.duelsBonus}
                   </Text>
                   <Text style={[styles.limitLabel, { color: theme.textSecondary }]}>
-                    Duelos
+                    {t('Duels', 'Duelos')}
                   </Text>
                 </View>
                 <View style={styles.limitItem}>
@@ -363,7 +367,7 @@ export const RewardsScreen: React.FC = () => {
                     {dailyLimits.aiMessagesRemaining}/{dailyLimits.aiMessagesMax + dailyLimits.aiMessagesBonus}
                   </Text>
                   <Text style={[styles.limitLabel, { color: theme.textSecondary }]}>
-                    IA
+                    {t('AI', 'IA')}
                   </Text>
                 </View>
                 <View style={styles.limitItem}>
@@ -383,21 +387,20 @@ export const RewardsScreen: React.FC = () => {
           <View style={[styles.infoBanner, { backgroundColor: "#8B5CF620" }]}>
             <Text style={styles.infoIcon}>💡</Text>
             <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-              Los anuncios son 100% voluntarios. Nunca verás anuncios sin tu
-              consentimiento.
+              {t("Ads are 100% voluntary. You'll never see ads without your consent.", "Los anuncios son 100% voluntarios. Nunca verás anuncios sin tu consentimiento.")}
             </Text>
           </View>
 
           {/* Rewards List */}
           <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-            RECOMPENSAS DISPONIBLES
+            {t('AVAILABLE REWARDS', 'RECOMPENSAS DISPONIBLES')}
           </Text>
 
           {rewards.map(renderRewardCard)}
 
           {/* Buy with QC Section */}
           <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-            O COMPRA CON QUEST COINS
+            {t('OR BUY WITH QUEST COINS', 'O COMPRA CON QUEST COINS')}
           </Text>
 
           <TouchableOpacity
@@ -411,10 +414,10 @@ export const RewardsScreen: React.FC = () => {
               <Text style={styles.qcIcon}>🛒</Text>
               <View>
                 <Text style={[styles.qcTitle, { color: theme.text }]}>
-                  Tienda de Quest Coins
+                  {t('Quest Coins Store', 'Tienda de Quest Coins')}
                 </Text>
                 <Text style={[styles.qcSubtitle, { color: theme.textSecondary }]}>
-                  Compra life paths, duelos, y más con QC
+                  {t('Buy life paths, duels, and more with QC', 'Compra life paths, duelos, y más con QC')}
                 </Text>
               </View>
             </View>

@@ -10,21 +10,27 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store';
+import { PremiumService } from '../../lib/premium';
 
 const { width } = Dimensions.get('window');
+
+// Pillar limits by plan
+const FREE_PILLAR_LIMIT = 2;
+const PREMIUM_WARNING_THRESHOLD = 4; // Warn if selecting more than 4
 
 interface InitialSetupScreenProps {
   onComplete: () => void;
   initialStep?: SetupStep;
 }
 
-type SetupStep = 'language' | 'name' | 'age' | 'survey_length';
+type SetupStep = 'language' | 'name' | 'age' | 'pillars' | 'survey_length';
 
 const LANGUAGES = [
   { code: 'es', name: 'Español', flag: '🇪🇸' },
@@ -70,6 +76,51 @@ const SURVEY_LENGTHS = [
   },
 ];
 
+const PILLARS = [
+  {
+    id: 'physical',
+    icon: '💪',
+    color: '#EF4444',
+    name: { en: 'Physical', es: 'Físico' },
+    description: { en: 'Exercise, nutrition, sleep, health', es: 'Ejercicio, nutrición, sueño, salud' },
+  },
+  {
+    id: 'mental',
+    icon: '🧠',
+    color: '#3B82F6',
+    name: { en: 'Mental', es: 'Mental' },
+    description: { en: 'Learning, focus, mindfulness, therapy', es: 'Aprendizaje, enfoque, mindfulness, terapia' },
+  },
+  {
+    id: 'social',
+    icon: '❤️',
+    color: '#EC4899',
+    name: { en: 'Social', es: 'Social' },
+    description: { en: 'Relationships, family, friends, community', es: 'Relaciones, familia, amigos, comunidad' },
+  },
+  {
+    id: 'professional',
+    icon: '💼',
+    color: '#10B981',
+    name: { en: 'Professional', es: 'Profesional' },
+    description: { en: 'Career, skills, finances, growth', es: 'Carrera, habilidades, finanzas, crecimiento' },
+  },
+  {
+    id: 'spiritual',
+    icon: '✨',
+    color: '#8B5CF6',
+    name: { en: 'Spiritual', es: 'Espiritual' },
+    description: { en: 'Purpose, values, faith, inner peace', es: 'Propósito, valores, fe, paz interior' },
+  },
+  {
+    id: 'creative',
+    icon: '🎨',
+    color: '#F97316',
+    name: { en: 'Creative', es: 'Creativo' },
+    description: { en: 'Art, music, writing, hobbies', es: 'Arte, música, escritura, hobbies' },
+  },
+];
+
 export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComplete, initialStep }) => {
   const { mode } = useThemeStore();
   const { language, setLanguage } = useLanguageStore();
@@ -80,11 +131,24 @@ export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComple
   const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'es'>(language);
   const [displayName, setDisplayName] = useState('');
   const [ageRange, setAgeRange] = useState('');
+  const [selectedPillars, setSelectedPillars] = useState<string[]>([]);
   const [surveyLength, setSurveyLength] = useState('medium');
   const [saving, setSaving] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(!!initialStep);
+  const [isPremium, setIsPremium] = useState(false);
 
   const t = (en: string, es: string) => selectedLanguage === 'es' ? es : en;
+
+  // Check premium status
+  useEffect(() => {
+    const checkPremium = async () => {
+      if (user?.id) {
+        const status = await PremiumService.getStatus(user.id);
+        setIsPremium(status.isPremium);
+      }
+    };
+    checkPremium();
+  }, [user?.id]);
 
   // Load existing profile data when coming back from Assessment
   useEffect(() => {
@@ -144,6 +208,11 @@ export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComple
     } else if (step === 'age') {
       if (!ageRange) return;
       await saveProgress({ age_range: ageRange });
+      setStep('pillars');
+    } else if (step === 'pillars') {
+      if (selectedPillars.length === 0) return;
+      // Save active pillars
+      await savePillarSelection();
       setStep('survey_length');
     } else if (step === 'survey_length') {
       await saveSetup();
@@ -153,7 +222,138 @@ export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComple
   const handleBack = () => {
     if (step === 'name') setStep('language');
     else if (step === 'age') setStep('name');
-    else if (step === 'survey_length') setStep('age');
+    else if (step === 'pillars') setStep('age');
+    else if (step === 'survey_length') setStep('pillars');
+  };
+
+  const togglePillar = (pillarId: string) => {
+    if (selectedPillars.includes(pillarId)) {
+      // Always allow deselection
+      setSelectedPillars(selectedPillars.filter(id => id !== pillarId));
+    } else {
+      // Check limits based on plan
+      if (!isPremium && selectedPillars.length >= FREE_PILLAR_LIMIT) {
+        Alert.alert(
+          t('Free Plan Limit', 'Límite del Plan Gratuito'),
+          t(
+            `Free users can focus on up to ${FREE_PILLAR_LIMIT} pillars. Upgrade to Premium for unlimited focus areas!`,
+            `Los usuarios gratuitos pueden enfocarse en hasta ${FREE_PILLAR_LIMIT} pilares. ¡Actualiza a Premium para áreas de enfoque ilimitadas!`
+          ),
+          [
+            { text: t('OK', 'OK'), style: 'cancel' },
+            { 
+              text: t('Go Premium', 'Ir a Premium'), 
+              onPress: () => {
+                // TODO: Navigate to premium screen
+              }
+            }
+          ]
+        );
+        return;
+      }
+      
+      // Warn premium users if selecting more than 4
+      const newCount = selectedPillars.length + 1;
+      if (isPremium && newCount > PREMIUM_WARNING_THRESHOLD && newCount === PREMIUM_WARNING_THRESHOLD + 1) {
+        Alert.alert(
+          t('Focus Warning', 'Advertencia de Enfoque'),
+          t(
+            'Selecting more than 4 pillars means less focus on each one. Quality over quantity! Are you sure?',
+            'Seleccionar más de 4 pilares significa menos enfoque en cada uno. ¡Calidad sobre cantidad! ¿Estás seguro?'
+          ),
+          [
+            { text: t('Cancel', 'Cancelar'), style: 'cancel' },
+            { 
+              text: t('Continue', 'Continuar'), 
+              onPress: () => setSelectedPillars([...selectedPillars, pillarId])
+            }
+          ]
+        );
+        return;
+      }
+      
+      setSelectedPillars([...selectedPillars, pillarId]);
+    }
+  };
+
+  const savePillarSelection = async () => {
+    try {
+      // First, deactivate all pillars
+      await supabase
+        .from('user_pillars')
+        .update({ is_active: false, priority: 0 })
+        .eq('user_id', user?.id);
+
+      // Then activate selected pillars with priority
+      for (let i = 0; i < selectedPillars.length; i++) {
+        await supabase
+          .from('user_pillars')
+          .update({ 
+            is_active: true, 
+            priority: i + 1,
+            activated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user?.id)
+          .eq('pillar_id', selectedPillars[i]);
+      }
+    } catch (err) {
+      console.error('Error saving pillar selection:', err);
+    }
+  };
+
+  const createInitialLifePath = async () => {
+    if (!user?.id || selectedPillars.length === 0) return;
+
+    try {
+      // Create a default Life Path based on first selected pillar
+      const primaryPillar = selectedPillars[0];
+      const pillarInfo = PILLARS.find(p => p.id === primaryPillar);
+      
+      const defaultTitles: Record<string, { en: string; es: string }> = {
+        physical: { en: 'Become My Healthiest Self', es: 'Ser Mi Mejor Versión Física' },
+        mental: { en: 'Sharpen My Mind', es: 'Fortalecer Mi Mente' },
+        social: { en: 'Build Meaningful Relationships', es: 'Construir Relaciones Significativas' },
+        professional: { en: 'Grow My Career', es: 'Crecer Profesionalmente' },
+        spiritual: { en: 'Deepen My Inner Peace', es: 'Profundizar Mi Paz Interior' },
+        creative: { en: 'Unleash My Creativity', es: 'Liberar Mi Creatividad' },
+      };
+
+      const title = selectedLanguage === 'es' 
+        ? defaultTitles[primaryPillar]?.es || 'Mi Primer Camino'
+        : defaultTitles[primaryPillar]?.en || 'My First Path';
+
+      // Create the Life Path
+      const { data: pathData, error } = await supabase
+        .from('life_paths')
+        .insert({
+          user_id: user.id,
+          title,
+          pillar_id: primaryPillar,
+          icon: pillarInfo?.icon || '🎯',
+          color: pillarInfo?.color || '#8B5CF6',
+          target_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 6 months
+          status: 'active',
+          ai_generated: true,
+        })
+        .select('id')
+        .single();
+
+      if (!error && pathData?.id) {
+        // Import questAI and expand the path with AI
+        const questAI = require('../../lib/openai').default;
+        await questAI.expandLifePath(
+          user.id,
+          pathData.id,
+          title,
+          null,
+          primaryPillar,
+          6 // Default 6 months for onboarding
+        );
+      }
+    } catch (err) {
+      console.error('Error creating initial life path:', err);
+      // Don't block onboarding if this fails
+    }
   };
 
   const saveSetup = async () => {
@@ -172,6 +372,10 @@ export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComple
         .eq('id', user?.id);
 
       if (error) throw error;
+      
+      // Create initial Life Path in background
+      createInitialLifePath();
+      
       onComplete();
     } catch (err) {
       console.error('Error saving setup:', err);
@@ -184,12 +388,13 @@ export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComple
     if (step === 'language') return true;
     if (step === 'name') return displayName.trim().length >= 2;
     if (step === 'age') return !!ageRange;
+    if (step === 'pillars') return selectedPillars.length >= 1;
     if (step === 'survey_length') return !!surveyLength;
     return false;
   };
 
   const getStepNumber = () => {
-    const steps: SetupStep[] = ['language', 'name', 'age', 'survey_length'];
+    const steps: SetupStep[] = ['language', 'name', 'age', 'pillars', 'survey_length'];
     return steps.indexOf(step) + 1;
   };
 
@@ -213,7 +418,7 @@ export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComple
       height: '100%',
       backgroundColor: theme.primary,
       borderRadius: 2,
-      width: `${(getStepNumber() / 4) * 100}%`,
+      width: `${(getStepNumber() / 5) * 100}%`,
     },
     stepIndicator: {
       fontSize: 14,
@@ -481,6 +686,78 @@ export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComple
     </>
   );
 
+  const renderPillarsStep = () => (
+    <>
+      <Text style={styles.title}>
+        {t('What do you want to improve?', '¿En qué te quieres enfocar?')}
+      </Text>
+      <Text style={styles.subtitle}>
+        {t(
+          'Choose the areas of your life you want to work on right now. You can always add more later.',
+          'Elige las áreas de tu vida en las que quieres trabajar ahora. Siempre podrás agregar más después.'
+        )}
+      </Text>
+      <View style={{ marginTop: 8 }}>
+        {PILLARS.map((pillar) => {
+          const isSelected = selectedPillars.includes(pillar.id);
+          return (
+            <TouchableOpacity
+              key={pillar.id}
+              style={[
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isSelected ? pillar.color + '15' : theme.surface,
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 10,
+                  borderWidth: 2,
+                  borderColor: isSelected ? pillar.color : 'transparent',
+                },
+              ]}
+              onPress={() => togglePillar(pillar.id)}
+            >
+              <Text style={{ fontSize: 28, marginRight: 14 }}>{pillar.icon}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 17, fontWeight: '600', color: theme.text }}>
+                  {pillar.name[selectedLanguage]}
+                </Text>
+                <Text style={{ fontSize: 13, color: theme.textSecondary, marginTop: 2 }}>
+                  {pillar.description[selectedLanguage]}
+                </Text>
+              </View>
+              {isSelected && (
+                <View style={{
+                  width: 26, height: 26, borderRadius: 13,
+                  backgroundColor: pillar.color,
+                  justifyContent: 'center', alignItems: 'center',
+                }}>
+                  <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>✓</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <View style={[styles.surveyNote, { marginTop: 10 }]}>
+        <Text style={styles.surveyNoteText}>
+          {isPremium ? t(
+            '💡 Tip: Start with 2-3 pillars for better focus. You can activate more in your profile anytime!',
+            '💡 Tip: Empieza con 2-3 pilares para mejor enfoque. ¡Puedes activar más en tu perfil cuando quieras!'
+          ) : t(
+            `🆓 Free Plan: Up to ${FREE_PILLAR_LIMIT} pillars. Go Premium for unlimited focus areas!`,
+            `🆓 Plan Gratuito: Hasta ${FREE_PILLAR_LIMIT} pilares. ¡Hazte Premium para áreas ilimitadas!`
+          )}
+        </Text>
+      </View>
+      {selectedPillars.length > 0 && (
+        <Text style={{ textAlign: 'center', color: theme.textSecondary, marginTop: 8 }}>
+          {t('Selected', 'Seleccionados')}: {selectedPillars.length}{!isPremium ? `/${FREE_PILLAR_LIMIT}` : ''}
+        </Text>
+      )}
+    </>
+  );
+
   // Loading state when coming back from Assessment
   if (loadingProfile) {
     return (
@@ -503,12 +780,13 @@ export const InitialSetupScreen: React.FC<InitialSetupScreenProps> = ({ onComple
             <View style={styles.progressFill} />
           </View>
           <Text style={styles.stepIndicator}>
-            {t(`Step ${getStepNumber()} of 4`, `Paso ${getStepNumber()} de 4`)}
+            {t(`Step ${getStepNumber()} of 5`, `Paso ${getStepNumber()} de 5`)}
           </Text>
           
           {step === 'language' && renderLanguageStep()}
           {step === 'name' && renderNameStep()}
           {step === 'age' && renderAgeStep()}
+          {step === 'pillars' && renderPillarsStep()}
           {step === 'survey_length' && renderSurveyLengthStep()}
         </ScrollView>
 

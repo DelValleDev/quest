@@ -11,7 +11,7 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import { useThemeStore } from '../../store';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
@@ -49,7 +49,11 @@ interface Friend {
 
 export const DuelsScreen: React.FC = () => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const [duels, setDuels] = useState<Duel[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -136,7 +140,7 @@ export const DuelsScreen: React.FC = () => {
 
   const createDuel = async () => {
     if (!duelTitle.trim() || !selectedOpponent) {
-      Alert.alert('Error', 'Please enter a title and select an opponent');
+      Alert.alert(t('Error', 'Error'), t('Please enter a title and select an opponent', 'Por favor ingresa un título y selecciona un oponente'));
       return;
     }
 
@@ -156,7 +160,7 @@ export const DuelsScreen: React.FC = () => {
 
       if (error) throw error;
 
-      Alert.alert('Challenge Sent! ⚔️', `${selectedOpponent.display_name} has been challenged!`);
+      Alert.alert(t('Challenge Sent! ⚔️', '¡Desafío Enviado! ⚔️'), t(`${selectedOpponent.display_name} has been challenged!`, `¡${selectedOpponent.display_name} ha sido desafiado!`));
       setShowCreateModal(false);
       resetForm();
       fetchDuels();
@@ -179,7 +183,7 @@ export const DuelsScreen: React.FC = () => {
       if (error) throw error;
       
       if (data.success) {
-        Alert.alert(accept ? 'Duel Accepted! ⚔️' : 'Duel Declined', data.message);
+        Alert.alert(accept ? t('Duel Accepted! ⚔️', '¡Duelo Aceptado! ⚔️') : t('Duel Declined', 'Duelo Rechazado'), data.message);
         fetchDuels();
       } else {
         Alert.alert('Error', data.error);
@@ -254,12 +258,12 @@ export const DuelsScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>⚔️ Duels</Text>
+        <Text style={[styles.title, { color: theme.text }]}>⚔️ {t('Duels', 'Duelos')}</Text>
         <TouchableOpacity
           style={[styles.createButton, { backgroundColor: theme.primary }]}
           onPress={() => setShowCreateModal(true)}
         >
-          <Text style={styles.createButtonText}>+ Challenge</Text>
+          <Text style={styles.createButtonText}>+ {t('Challenge', 'Desafiar')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -296,14 +300,14 @@ export const DuelsScreen: React.FC = () => {
           <View style={[styles.emptyState, { backgroundColor: theme.surface }]}>
             <Text style={styles.emptyEmoji}>⚔️</Text>
             <Text style={[styles.emptyTitle, { color: theme.text }]}>
-              No {selectedTab} duels
+              {t(`No ${selectedTab} duels`, `No hay duelos ${selectedTab === 'active' ? 'activos' : selectedTab === 'pending' ? 'pendientes' : 'completados'}`)}
             </Text>
             <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
               {selectedTab === 'active' 
-                ? 'Challenge a friend to start a duel!'
+                ? t('Challenge a friend to start a duel!', '¡Desafía a un amigo para empezar un duelo!')
                 : selectedTab === 'pending'
-                ? 'No pending challenges'
-                : 'Completed duels will appear here'}
+                ? t('No pending challenges', 'No hay desafíos pendientes')
+                : t('Completed duels will appear here', 'Los duelos completados aparecerán aquí')}
             </Text>
           </View>
         ) : (
@@ -337,7 +341,7 @@ export const DuelsScreen: React.FC = () => {
                     {duel.is_challenger ? '👤' : '👥'}
                   </Text>
                   <Text style={[styles.participantName, { color: theme.text }]}>
-                    {duel.is_challenger ? 'You' : duel.challenger.display_name}
+                    {duel.is_challenger ? t('You', 'Tú') : duel.challenger.display_name}
                   </Text>
                   <Text style={[styles.participantScore, { color: theme.primary }]}>
                     {duel.is_challenger ? duel.my_progress?.value || 0 : duel.opponent_progress?.value || 0}
@@ -351,7 +355,7 @@ export const DuelsScreen: React.FC = () => {
                     {!duel.is_challenger ? '👤' : '👥'}
                   </Text>
                   <Text style={[styles.participantName, { color: theme.text }]}>
-                    {!duel.is_challenger ? 'You' : duel.opponent.display_name}
+                    {!duel.is_challenger ? t('You', 'Tú') : duel.opponent.display_name}
                   </Text>
                   <Text style={[styles.participantScore, { color: theme.primary }]}>
                     {!duel.is_challenger ? duel.my_progress?.value || 0 : duel.opponent_progress?.value || 0}
@@ -362,13 +366,13 @@ export const DuelsScreen: React.FC = () => {
               {/* Stakes & Time */}
               <View style={styles.duelMeta}>
                 <View style={styles.metaItem}>
-                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Stake</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>{t('Stake', 'Apuesta')}</Text>
                   <Text style={[styles.metaValue, { color: theme.text }]}>
-                    {duel.stake_type === 'coins' ? `${duel.stake_amount} 🪙` : '🏅 Honor'}
+                    {duel.stake_type === 'coins' ? `${duel.stake_amount} 🪙` : t('🏅 Honor', '🏅 Honor')}
                   </Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>Time</Text>
+                  <Text style={[styles.metaLabel, { color: theme.textSecondary }]}>{t('Time', 'Tiempo')}</Text>
                   <Text style={[styles.metaValue, { color: theme.text }]}>
                     {getTimeRemaining(duel.ends_at)}
                   </Text>
@@ -382,13 +386,13 @@ export const DuelsScreen: React.FC = () => {
                     style={[styles.actionButton, styles.acceptButton]}
                     onPress={() => respondToDuel(duel, true)}
                   >
-                    <Text style={styles.actionButtonText}>Accept ⚔️</Text>
+                    <Text style={styles.actionButtonText}>{t('Accept ⚔️', 'Aceptar ⚔️')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.declineButton]}
                     onPress={() => respondToDuel(duel, false)}
                   >
-                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Decline</Text>
+                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>{t('Decline', 'Rechazar')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -398,7 +402,7 @@ export const DuelsScreen: React.FC = () => {
                   style={[styles.updateButton, { backgroundColor: theme.primary }]}
                   onPress={() => updateProgress(duel)}
                 >
-                  <Text style={styles.updateButtonText}>Update Progress 📊</Text>
+                  <Text style={styles.updateButtonText}>{t('Update Progress 📊', 'Actualizar Progreso 📊')}</Text>
                 </TouchableOpacity>
               )}
 
@@ -412,7 +416,7 @@ export const DuelsScreen: React.FC = () => {
                       ? '#22C55E' : '#EF4444'
                   }]}>
                     {duel.winner_id === (duel.is_challenger ? duel.challenger.id : duel.opponent.id) 
-                      ? '🏆 Victory!' : '😔 Defeat'}
+                      ? t('🏆 Victory!', '🏆 ¡Victoria!') : t('😔 Defeat', '😔 Derrota')}
                   </Text>
                 </View>
               )}
@@ -426,12 +430,12 @@ export const DuelsScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
             <Text style={[styles.modalTitle, { color: theme.text }]}>
-              ⚔️ Create Challenge
+              ⚔️ {t('Create Challenge', 'Crear Desafío')}
             </Text>
 
             <TextInput
               style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
-              placeholder="Challenge Title"
+              placeholder={t('Challenge Title', 'Título del Desafío')}
               placeholderTextColor={theme.textMuted}
               value={duelTitle}
               onChangeText={setDuelTitle}
@@ -439,7 +443,7 @@ export const DuelsScreen: React.FC = () => {
 
             <TextInput
               style={[styles.input, styles.textArea, { backgroundColor: theme.background, color: theme.text }]}
-              placeholder="Description (optional)"
+              placeholder={t('Description (optional)', 'Descripción (opcional)')}
               placeholderTextColor={theme.textMuted}
               value={duelDescription}
               onChangeText={setDuelDescription}
@@ -447,7 +451,7 @@ export const DuelsScreen: React.FC = () => {
             />
 
             {/* Opponent Selection */}
-            <Text style={[styles.label, { color: theme.text }]}>Select Opponent</Text>
+            <Text style={[styles.label, { color: theme.text }]}>{t('Select Opponent', 'Seleccionar Oponente')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.friendsScroll}>
               {friends.map((friend) => (
                 <TouchableOpacity
@@ -469,13 +473,13 @@ export const DuelsScreen: React.FC = () => {
               ))}
               {friends.length === 0 && (
                 <Text style={[styles.noFriends, { color: theme.textMuted }]}>
-                  Add friends to challenge them!
+                  {t('Add friends to challenge them!', '¡Agrega amigos para desafiarlos!')}
                 </Text>
               )}
             </ScrollView>
 
             {/* Stake Type */}
-            <Text style={[styles.label, { color: theme.text }]}>Stake Type</Text>
+            <Text style={[styles.label, { color: theme.text }]}>{t('Stake Type', 'Tipo de Apuesta')}</Text>
             <View style={styles.stakeOptions}>
               <TouchableOpacity
                 style={[
@@ -506,7 +510,7 @@ export const DuelsScreen: React.FC = () => {
             {stakeType === 'coins' && (
               <TextInput
                 style={[styles.input, { backgroundColor: theme.background, color: theme.text }]}
-                placeholder="Amount to stake"
+                placeholder={t('Amount to stake', 'Cantidad a apostar')}
                 placeholderTextColor={theme.textMuted}
                 value={stakeAmount}
                 onChangeText={setStakeAmount}
@@ -515,7 +519,7 @@ export const DuelsScreen: React.FC = () => {
             )}
 
             {/* Duration */}
-            <Text style={[styles.label, { color: theme.text }]}>Duration (days)</Text>
+            <Text style={[styles.label, { color: theme.text }]}>{t('Duration (days)', 'Duración (días)')}</Text>
             <View style={styles.durationOptions}>
               {['3', '7', '14', '30'].map((days) => (
                 <TouchableOpacity
@@ -540,13 +544,13 @@ export const DuelsScreen: React.FC = () => {
                 style={[styles.modalButton, { backgroundColor: theme.border }]}
                 onPress={() => { setShowCreateModal(false); resetForm(); }}
               >
-                <Text style={[styles.modalButtonText, { color: theme.text }]}>Cancel</Text>
+                <Text style={[styles.modalButtonText, { color: theme.text }]}>{t('Cancel', 'Cancelar')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, { backgroundColor: theme.primary }]}
                 onPress={createDuel}
               >
-                <Text style={styles.modalButtonText}>Challenge! ⚔️</Text>
+                <Text style={styles.modalButtonText}>{t('Challenge! ⚔️', '¡Desafiar! ⚔️')}</Text>
               </TouchableOpacity>
             </View>
           </View>

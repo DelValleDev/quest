@@ -8,7 +8,8 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import { useThemeStore } from '../../store';
+import { useNavigation } from '@react-navigation/native';
+import { useThemeStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
@@ -40,19 +41,24 @@ const RARITY_COLORS: Record<string, { bg: string; text: string; border: string }
   legendary: { bg: '#F59E0B20', text: '#F59E0B', border: '#F59E0B' },
 };
 
-const CATEGORY_LABELS: Record<string, { name: string; icon: string }> = {
-  streak: { name: 'Streaks', icon: '🔥' },
-  challenges: { name: 'Challenges', icon: '⚔️' },
-  pillar: { name: 'Pillar Mastery', icon: '🏆' },
-  special: { name: 'Special', icon: '✨' },
-  milestone: { name: 'Milestones', icon: '🎯' },
+const CATEGORY_LABELS: Record<string, { name: string; nameEs: string; icon: string }> = {
+  streak: { name: 'Streaks', nameEs: 'Rachas', icon: '🔥' },
+  challenges: { name: 'Challenges', nameEs: 'Desafíos', icon: '⚔️' },
+  pillar: { name: 'Pillar Mastery', nameEs: 'Dominio de Pilar', icon: '🏆' },
+  special: { name: 'Special', nameEs: 'Especial', icon: '✨' },
+  milestone: { name: 'Milestones', nameEs: 'Hitos', icon: '🎯' },
 };
 
 type TabType = 'all' | 'unlocked' | 'locked';
 
 export const AchievementsScreen: React.FC = () => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
+  const navigation = useNavigation();
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,10 +132,18 @@ export const AchievementsScreen: React.FC = () => {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Achievements</Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
-          {unlockedCount} / {totalCount} unlocked
-        </Text>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          style={{ marginRight: 12, padding: 4 }}
+        >
+          <Text style={{ fontSize: 24, color: theme.text }}>←</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.title, { color: theme.text }]}>{t('Achievements', 'Logros')}</Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            {unlockedCount} / {totalCount} {t('unlocked', 'desbloqueados')}
+          </Text>
+        </View>
       </View>
 
       {/* Progress Bar */}
@@ -137,7 +151,7 @@ export const AchievementsScreen: React.FC = () => {
         <View style={styles.progressHeader}>
           <Text style={styles.trophyEmoji}>🏆</Text>
           <Text style={[styles.progressText, { color: theme.text }]}>
-            {Math.round((unlockedCount / Math.max(totalCount, 1)) * 100)}% Complete
+            {Math.round((unlockedCount / Math.max(totalCount, 1)) * 100)}% {t('Complete', 'Completado')}
           </Text>
         </View>
         <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
@@ -172,7 +186,7 @@ export const AchievementsScreen: React.FC = () => {
                 { color: activeTab === tab ? 'white' : theme.textSecondary },
               ]}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'all' ? t('All', 'Todo') : tab === 'unlocked' ? t('Unlocked', 'Desbloqueados') : t('Locked', 'Bloqueados')}
             </Text>
           </TouchableOpacity>
         ))}
@@ -200,7 +214,7 @@ export const AchievementsScreen: React.FC = () => {
               { color: !selectedCategory ? 'white' : theme.textSecondary },
             ]}
           >
-            All
+            {t('All', 'Todo')}
           </Text>
         </TouchableOpacity>
         {categories.map(([key, value]) => (
@@ -221,7 +235,7 @@ export const AchievementsScreen: React.FC = () => {
                 { color: selectedCategory === key ? 'white' : theme.textSecondary },
               ]}
             >
-              {value.name}
+              {language === 'es' ? value.nameEs : value.name}
             </Text>
           </TouchableOpacity>
         ))}
@@ -337,6 +351,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 12,

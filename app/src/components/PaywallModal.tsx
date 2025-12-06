@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore } from '../store';
+import { useThemeStore, useLanguageStore } from '../store';
 import { getTheme } from '../theme/colors';
 import { PREMIUM_FEATURES, PremiumFeatureId } from '../lib/premium';
 
@@ -36,8 +36,12 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
   customMessage,
 }) => {
   const { mode } = useThemeStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
 
   const feature = featureId ? PREMIUM_FEATURES[featureId] : null;
 
@@ -62,7 +66,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
 
           {/* Title */}
           <Text style={[styles.title, { color: theme.text }]}>
-            {customTitle || 'Función Premium'}
+            {customTitle || t('Premium Feature', 'Función Premium')}
           </Text>
 
           {/* Feature info */}
@@ -83,7 +87,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
           {/* Message */}
           <Text style={[styles.message, { color: theme.textSecondary }]}>
             {customMessage || 
-              `Esta función está disponible solo para usuarios Premium. Actualiza tu plan para desbloquear todas las funcionalidades.`
+              t('This feature is only available for Premium users. Upgrade your plan to unlock all features.', 'Esta función está disponible solo para usuarios Premium. Actualiza tu plan para desbloquear todas las funcionalidades.')
             }
           </Text>
 
@@ -92,19 +96,19 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
             <View style={styles.benefitRow}>
               <Text style={styles.benefitIcon}>✓</Text>
               <Text style={[styles.benefitText, { color: theme.text }]}>
-                Acceso ilimitado a todas las funciones
+                {t('Unlimited access to all features', 'Acceso ilimitado a todas las funciones')}
               </Text>
             </View>
             <View style={styles.benefitRow}>
               <Text style={styles.benefitIcon}>✓</Text>
               <Text style={[styles.benefitText, { color: theme.text }]}>
-                Chat ilimitado con Quest Coach
+                {t('Unlimited chat with Quest Coach', 'Chat ilimitado con Quest Coach')}
               </Text>
             </View>
             <View style={styles.benefitRow}>
               <Text style={styles.benefitIcon}>✓</Text>
               <Text style={[styles.benefitText, { color: theme.text }]}>
-                Life Paths y hábitos ilimitados
+                {t('Unlimited Life Paths and habits', 'Life Paths y hábitos ilimitados')}
               </Text>
             </View>
           </View>
@@ -115,7 +119,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
             onPress={handleViewPlans}
           >
             <Text style={styles.primaryButtonText}>
-              👑 Ver Planes Premium
+              👑 {t('View Premium Plans', 'Ver Planes Premium')}
             </Text>
           </TouchableOpacity>
 
@@ -124,7 +128,7 @@ export const PaywallModal: React.FC<PaywallModalProps> = ({
             onPress={onClose}
           >
             <Text style={[styles.secondaryButtonText, { color: theme.textSecondary }]}>
-              Ahora no
+              {t('Not now', 'Ahora no')}
             </Text>
           </TouchableOpacity>
         </View>

@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useThemeStore, useAuthStore } from '../../store';
+import { useThemeStore, useAuthStore, useLanguageStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import type { RootStackParamList } from '../../../App';
@@ -35,7 +35,7 @@ interface CharacterClass {
 // =====================================================
 // CLASS DETAILS
 // =====================================================
-const CLASS_DETAILS: Record<string, {
+const CLASS_DETAILS_EN: Record<string, {
   tagline: string;
   traits: string[];
   challenges: string[];
@@ -72,7 +72,44 @@ const CLASS_DETAILS: Record<string, {
   },
 };
 
-const PILLAR_NAMES: Record<string, string> = {
+const CLASS_DETAILS_ES: Record<string, {
+  tagline: string;
+  traits: string[];
+  challenges: string[];
+}> = {
+  warrior: {
+    tagline: 'Forja Tu Cuerpo, Forja Tu Voluntad',
+    traits: ['Disciplinado', 'Fuerte', 'Resiliente'],
+    challenges: ['Entrenamientos diarios', 'Metas de pasos', 'Seguimiento nutricional', 'Optimización del sueño'],
+  },
+  sage: {
+    tagline: 'El Conocimiento Es El Poder Supremo',
+    traits: ['Curioso', 'Enfocado', 'Analítico'],
+    challenges: ['Metas de lectura', 'Sesiones de aprendizaje', 'Tiempo de enfoque', 'Desarrollo de habilidades'],
+  },
+  connector: {
+    tagline: 'Juntos Nos Elevamos',
+    traits: ['Empático', 'Social', 'Solidario'],
+    challenges: ['Reuniones sociales', 'Actos de bondad', 'Tiempo en familia', 'Servicio comunitario'],
+  },
+  creator: {
+    tagline: 'Da Vida A Las Ideas',
+    traits: ['Creativo', 'Innovador', 'Expresivo'],
+    challenges: ['Proyectos artísticos', 'Sesiones de escritura', 'Práctica musical', 'Exploración creativa'],
+  },
+  achiever: {
+    tagline: 'El Éxito Deja Huellas',
+    traits: ['Ambicioso', 'Estratégico', 'Determinado'],
+    challenges: ['Metas profesionales', 'Desarrollo de habilidades', 'Networking', 'Hitos de proyectos'],
+  },
+  monk: {
+    tagline: 'Encuentra La Paz Interior',
+    traits: ['Consciente', 'Calmado', 'Con propósito'],
+    challenges: ['Meditación', 'Reflexión', 'Práctica de gratitud', 'Conexión con la naturaleza'],
+  },
+};
+
+const PILLAR_NAMES_EN: Record<string, string> = {
   physical: 'Physical',
   mental: 'Mental',
   social: 'Social',
@@ -81,16 +118,33 @@ const PILLAR_NAMES: Record<string, string> = {
   creative: 'Creative',
 };
 
+const PILLAR_NAMES_ES: Record<string, string> = {
+  physical: 'Físico',
+  mental: 'Mental',
+  social: 'Social',
+  professional: 'Profesional',
+  spiritual: 'Espiritual',
+  creative: 'Creativo',
+};
+
 // =====================================================
 // MAIN COMPONENT
 // =====================================================
 export const ClassSelectionScreen: React.FC = () => {
   const { mode } = useThemeStore();
   const { setIsOnboarded } = useAuthStore();
+  const { language } = useLanguageStore();
   const theme = getTheme(mode);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute();
   const isOnboarding = (route.params as any)?.onboarding ?? false;
+  
+  // Translation helper
+  const t = (en: string, es: string) => language === 'es' ? es : en;
+  
+  // Bilingual data
+  const CLASS_DETAILS = language === 'es' ? CLASS_DETAILS_ES : CLASS_DETAILS_EN;
+  const PILLAR_NAMES = language === 'es' ? PILLAR_NAMES_ES : PILLAR_NAMES_EN;
 
   // State
   const [loading, setLoading] = useState(true);
@@ -140,7 +194,7 @@ export const ClassSelectionScreen: React.FC = () => {
   // =====================================================
   const confirmSelection = async () => {
     if (!selectedClass) {
-      Alert.alert('Select a Class', 'Please choose your character class to continue.');
+      Alert.alert(t('Select a Class', 'Selecciona una Clase'), t('Please choose your character class to continue.', 'Por favor elige tu clase de personaje para continuar.'));
       return;
     }
 
@@ -148,18 +202,21 @@ export const ClassSelectionScreen: React.FC = () => {
       if (isOnboarding) {
         navigation.goBack();
       } else {
-        Alert.alert('Same Class', 'This is already your current class.');
+        Alert.alert(t('Same Class', 'Misma Clase'), t('This is already your current class.', 'Esta ya es tu clase actual.'));
       }
       return;
     }
 
     Alert.alert(
-      'Confirm Selection',
-      `Are you sure you want to become ${getClassName(selectedClass)}?\n\n${currentClass ? 'You can only change once per month.' : 'This will be your starting class.'}`,
+      t('Confirm Selection', 'Confirmar Selección'),
+      t(
+        `Are you sure you want to become ${getClassName(selectedClass)}?\n\n${currentClass ? 'You can only change once per month.' : 'This will be your starting class.'}`,
+        `¿Estás seguro de que quieres ser ${getClassName(selectedClass)}?\n\n${currentClass ? 'Solo puedes cambiar una vez al mes.' : 'Esta será tu clase inicial.'}`
+      ),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('Cancel', 'Cancelar'), style: 'cancel' },
         {
-          text: 'Confirm',
+          text: t('Confirm', 'Confirmar'),
           onPress: async () => {
             setSelecting(true);
             try {
@@ -172,22 +229,22 @@ export const ClassSelectionScreen: React.FC = () => {
               });
 
               if (error) {
-                Alert.alert('Error', error.message);
+                Alert.alert(t('Error', 'Error'), error.message);
                 return;
               }
 
               if (!data.success) {
-                Alert.alert('Cannot Change', data.error);
+                Alert.alert(t('Cannot Change', 'No Puedes Cambiar'), data.error);
                 return;
               }
 
               const classData = classes.find(c => c.id === selectedClass);
               Alert.alert(
-                `${classData?.icon} Welcome, ${classData?.name}!`,
-                'Your journey begins now. Your challenges will be tailored to your path.',
+                `${classData?.icon} ${t('Welcome', 'Bienvenido')}, ${classData?.name}!`,
+                t('Your journey begins now. Your challenges will be tailored to your path.', 'Tu viaje comienza ahora. Tus desafíos serán adaptados a tu camino.'),
                 [
                   {
-                    text: "Let's Go!",
+                    text: t("Let's Go!", '¡Vamos!'),
                     onPress: () => {
                       if (isOnboarding) {
                         // Set onboarded to true - this will re-render App and show Main
@@ -201,7 +258,7 @@ export const ClassSelectionScreen: React.FC = () => {
               );
             } catch (error) {
               console.error('Error selecting class:', error);
-              Alert.alert('Error', 'Failed to select class');
+              Alert.alert(t('Error', 'Error'), t('Failed to select class', 'Error al seleccionar clase'));
             } finally {
               setSelecting(false);
             }
@@ -232,16 +289,16 @@ export const ClassSelectionScreen: React.FC = () => {
       <View style={styles.header}>
         {!isOnboarding && (
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={[styles.backText, { color: theme.primary }]}>← Back</Text>
+            <Text style={[styles.backText, { color: theme.primary }]}>← {t('Back', 'Atrás')}</Text>
           </TouchableOpacity>
         )}
         <Text style={[styles.title, { color: theme.text }]}>
-          {currentClass ? 'Your Class' : 'Choose Your Path'}
+          {currentClass ? t('Your Class', 'Tu Clase') : t('Choose Your Path', 'Elige Tu Camino')}
         </Text>
         <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           {currentClass 
-            ? canChange ? 'You can change your class' : 'Class change available next month'
-            : 'This determines your challenge focus'
+            ? canChange ? t('You can change your class', 'Puedes cambiar tu clase') : t('Class change available next month', 'Cambio de clase disponible el próximo mes')
+            : t('This determines your challenge focus', 'Esto determina el enfoque de tus desafíos')
           }
         </Text>
       </View>
@@ -274,7 +331,7 @@ export const ClassSelectionScreen: React.FC = () => {
               {/* Current Badge */}
               {isCurrent && (
                 <View style={[styles.currentBadge, { backgroundColor: characterClass.color }]}>
-                  <Text style={styles.currentBadgeText}>Current</Text>
+                  <Text style={styles.currentBadgeText}>{t('Current', 'Actual')}</Text>
                 </View>
               )}
 
@@ -311,7 +368,7 @@ export const ClassSelectionScreen: React.FC = () => {
               {/* Focus Pillars */}
               <View style={styles.focusSection}>
                 <Text style={[styles.focusLabel, { color: theme.textSecondary }]}>
-                  Primary Focus:
+                  {t('Primary Focus:', 'Enfoque Principal:')}
                 </Text>
                 <View style={styles.focusTags}>
                   <View style={[styles.focusTag, { backgroundColor: characterClass.color + '20' }]}>
@@ -332,7 +389,7 @@ export const ClassSelectionScreen: React.FC = () => {
               {/* Traits */}
               <View style={styles.traitsSection}>
                 <Text style={[styles.traitsLabel, { color: theme.textSecondary }]}>
-                  Traits:
+                  {t('Traits:', 'Rasgos:')}
                 </Text>
                 <View style={styles.traitsRow}>
                   {details?.traits.map((trait, index) => (
@@ -352,7 +409,7 @@ export const ClassSelectionScreen: React.FC = () => {
               {isSelected && details?.challenges && (
                 <View style={styles.challengesSection}>
                   <Text style={[styles.challengesLabel, { color: theme.textSecondary }]}>
-                    Sample Challenges:
+                    {t('Sample Challenges:', 'Desafíos de Ejemplo:')}
                   </Text>
                   {details.challenges.map((challenge, index) => (
                     <View key={index} style={styles.challengeItem}>
@@ -370,7 +427,7 @@ export const ClassSelectionScreen: React.FC = () => {
               {/* Bonus */}
               <View style={[styles.bonusSection, { backgroundColor: characterClass.color + '10' }]}>
                 <Text style={[styles.bonusText, { color: characterClass.color }]}>
-                  ⭐ +15% XP for {PILLAR_NAMES[characterClass.primary_pillar]} challenges
+                  ⭐ +15% XP {t('for', 'para')} {PILLAR_NAMES[characterClass.primary_pillar]} {t('challenges', 'desafíos')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -397,10 +454,10 @@ export const ClassSelectionScreen: React.FC = () => {
           ) : (
             <Text style={styles.confirmButtonText}>
               {currentClass && selectedClass === currentClass
-                ? 'Continue as ' + getClassName(selectedClass)
+                ? t('Continue as ', 'Continuar como ') + getClassName(selectedClass)
                 : selectedClass
-                  ? 'Become ' + getClassName(selectedClass)
-                  : 'Select a Class'
+                  ? t('Become ', 'Ser ') + getClassName(selectedClass)
+                  : t('Select a Class', 'Selecciona una Clase')
               }
             </Text>
           )}
