@@ -8,8 +8,8 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface NotificationPreferences {

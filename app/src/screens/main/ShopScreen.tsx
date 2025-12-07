@@ -8,8 +8,8 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ShopItem {
   id: string;

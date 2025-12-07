@@ -8,8 +8,8 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface Guild {
   id: string;
