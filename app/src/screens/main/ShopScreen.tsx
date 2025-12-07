@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../store/authStore';
 
 interface ShopItem {
   id: string;
@@ -22,7 +22,7 @@ interface ShopItem {
 }
 
 export default function ShopScreen() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [items, setItems] = useState<ShopItem[]>([]);
   const [userCoins, setUserCoins] = useState(0);
   const [filter, setFilter] = useState<'all' | 'cosmetic' | 'power_up' | 'boost'>('all');

@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../store/authStore';
 
 interface Task {
   id: string;
@@ -24,7 +24,7 @@ interface Task {
 }
 
 export default function TasksScreen() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('pending');
   const [loading, setLoading] = useState(true);

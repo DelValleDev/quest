@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../store/authStore';
 
 interface Habit {
   id: string;
@@ -25,7 +25,7 @@ interface Habit {
 }
 
 export default function HabitsScreen() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completedToday, setCompletedToday] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);

@@ -8,7 +8,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../store/authStore';
 
 interface LeaderboardEntry {
   id: string;
@@ -24,7 +24,7 @@ interface LeaderboardEntry {
 type LeaderboardType = 'level' | 'tasks' | 'habits' | 'coins';
 
 export default function LeaderboardScreen() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [type, setType] = useState<LeaderboardType>('level');
   const [userRank, setUserRank] = useState<number | null>(null);

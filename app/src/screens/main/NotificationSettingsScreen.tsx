@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuthStore } from '../../store/authStore';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface NotificationPreferences {
@@ -28,7 +28,7 @@ interface NotificationToggle {
 }
 
 export default function NotificationSettingsScreen() {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const [preferences, setPreferences] = useState<NotificationPreferences>({
     max_notifications_per_day: 3,
     quiet_hours_start: '22:00',
