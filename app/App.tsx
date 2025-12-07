@@ -292,8 +292,21 @@ export default function App() {
     setShowWelcome(false);
   };
 
-  const handleAuthSuccess = () => {
-    // Will check onboarding status automatically
+  const handleAuthSuccess = async () => {
+    console.log('[App] handleAuthSuccess called');
+    // Force check the session and onboarding status
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('[App] handleAuthSuccess - session check:', { hasSession: !!session, userId: session?.user?.id, error: error?.message });
+      
+      if (session?.user) {
+        setSession(session);
+        console.log('[App] handleAuthSuccess - calling checkOnboardingStatus');
+        await checkOnboardingStatus(session.user.id);
+      }
+    } catch (e) {
+      console.error('[App] handleAuthSuccess error:', e);
+    }
   };
 
   const handleInitialSetupComplete = () => {
