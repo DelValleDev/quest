@@ -31,6 +31,9 @@
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BODY_SENSORS",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.BODY_SENSORS"
       ]
     },
@@ -55,6 +58,12 @@
       "eas": {
         "projectId": "e6e02aa9-4086-48e7-a286-bf5500c6e821"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e6e02aa9-4086-48e7-a286-bf5500c6e821"
     }
   }
 }
