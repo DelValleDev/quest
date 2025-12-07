@@ -53,10 +53,12 @@ class SocialAuthService {
         );
 
         if (result.type === "success") {
-          // Extract tokens from the URL
+          // Extract tokens from the URL hash fragment
           const url = new URL(result.url);
-          const accessToken = url.searchParams.get("access_token");
-          const refreshToken = url.searchParams.get("refresh_token");
+          const hash = url.hash.substring(1); // Remove leading #
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get("access_token");
+          const refreshToken = params.get("refresh_token");
 
           if (accessToken) {
             const { data: sessionData, error: sessionError } =
@@ -67,6 +69,26 @@ class SocialAuthService {
 
             if (sessionError) {
               return { success: false, error: sessionError.message };
+            }
+
+            // Create profile if doesn't exist
+            if (sessionData.user) {
+              const { data: existingProfile } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("id", sessionData.user.id)
+                .single();
+
+              if (!existingProfile) {
+                await supabase.from("profiles").insert({
+                  id: sessionData.user.id,
+                  email: sessionData.user.email,
+                  display_name:
+                    sessionData.user.user_metadata?.full_name ||
+                    sessionData.user.email?.split("@")[0],
+                  avatar_url: sessionData.user.user_metadata?.avatar_url,
+                });
+              }
             }
 
             return { success: true, user: sessionData.user };
@@ -113,9 +135,12 @@ class SocialAuthService {
         );
 
         if (result.type === "success") {
+          // Extract tokens from the URL hash fragment
           const url = new URL(result.url);
-          const accessToken = url.searchParams.get("access_token");
-          const refreshToken = url.searchParams.get("refresh_token");
+          const hash = url.hash.substring(1); // Remove leading #
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get("access_token");
+          const refreshToken = params.get("refresh_token");
 
           if (accessToken) {
             const { data: sessionData, error: sessionError } =
@@ -126,6 +151,26 @@ class SocialAuthService {
 
             if (sessionError) {
               return { success: false, error: sessionError.message };
+            }
+
+            // Create profile if doesn't exist
+            if (sessionData.user) {
+              const { data: existingProfile } = await supabase
+                .from("profiles")
+                .select("id")
+                .eq("id", sessionData.user.id)
+                .single();
+
+              if (!existingProfile) {
+                await supabase.from("profiles").insert({
+                  id: sessionData.user.id,
+                  email: sessionData.user.email,
+                  display_name:
+                    sessionData.user.user_metadata?.full_name ||
+                    sessionData.user.email?.split("@")[0],
+                  avatar_url: sessionData.user.user_metadata?.avatar_url,
+                });
+              }
             }
 
             return { success: true, user: sessionData.user };

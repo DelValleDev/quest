@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { useThemeStore, useLanguageStore } from '../../store';
+import { useThemeStore, useLanguageStore, useAuthStore } from '../../store';
 import { getTheme } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { SocialAuth } from '../../lib/socialAuth';
@@ -30,6 +30,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   
   const { mode } = useThemeStore();
   const { language } = useLanguageStore();
+  const { setSession } = useAuthStore();
   const theme = getTheme(mode);
   
   // Translation helper
@@ -97,7 +98,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         ? await SocialAuth.signInWithGoogle()
         : await SocialAuth.signInWithApple();
       
-      if (result.success) {
+      if (result.success && result.user) {
+        // Get the current session after successful auth
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setSession(session);
+        }
         onAuthSuccess();
       } else if (result.error && !result.error.includes('cancelado')) {
         Alert.alert('Error', result.error);
