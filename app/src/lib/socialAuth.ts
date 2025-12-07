@@ -30,6 +30,7 @@ class SocialAuthService {
    */
   async signInWithGoogle(): Promise<SocialAuthResult> {
     try {
+      console.log("[Google Auth] Starting sign in...");
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -42,17 +43,23 @@ class SocialAuthService {
       });
 
       if (error) {
+        console.error("[Google Auth] OAuth init error:", error);
         return { success: false, error: error.message };
       }
 
       // For native, we need to open the URL
       if (data?.url) {
+        console.log("[Google Auth] Opening browser for OAuth...");
         const result = await WebBrowser.openAuthSessionAsync(
           data.url,
           redirectUri
         );
 
+        console.log("[Google Auth] Browser result type:", result.type);
+
         if (result.type === "success") {
+          console.log("[Google Auth] Full result URL:", result.url);
+
           // Extract tokens from the URL hash fragment
           const url = new URL(result.url);
           const hash = url.hash.substring(1); // Remove leading #
@@ -60,7 +67,14 @@ class SocialAuthService {
           const accessToken = params.get("access_token");
           const refreshToken = params.get("refresh_token");
 
+          console.log("[Google Auth] Token extraction:", {
+            hasAccessToken: !!accessToken,
+            hasRefreshToken: !!refreshToken,
+            hashLength: hash.length,
+          });
+
           if (accessToken) {
+            console.log("[Google Auth] Setting session with access token...");
             const { data: sessionData, error: sessionError } =
               await supabase.auth.setSession({
                 access_token: accessToken,
@@ -68,8 +82,14 @@ class SocialAuthService {
               });
 
             if (sessionError) {
+              console.error("[Google Auth] Session set error:", sessionError);
               return { success: false, error: sessionError.message };
             }
+
+            console.log(
+              "[Google Auth] Session set successfully. User:",
+              sessionData.user?.email
+            );
 
             // Create profile if doesn't exist
             if (sessionData.user) {
@@ -79,28 +99,51 @@ class SocialAuthService {
                 .eq("id", sessionData.user.id)
                 .single();
 
+              console.log(
+                "[Google Auth] Existing profile check:",
+                existingProfile ? "Found" : "Not found"
+              );
+
               if (!existingProfile) {
-                await supabase.from("profiles").insert({
-                  id: sessionData.user.id,
-                  email: sessionData.user.email,
-                  display_name:
-                    sessionData.user.user_metadata?.full_name ||
-                    sessionData.user.email?.split("@")[0],
-                  avatar_url: sessionData.user.user_metadata?.avatar_url,
-                });
+                console.log("[Google Auth] Creating new profile...");
+                const { error: insertError } = await supabase
+                  .from("profiles")
+                  .insert({
+                    id: sessionData.user.id,
+                    email: sessionData.user.email,
+                    display_name:
+                      sessionData.user.user_metadata?.full_name ||
+                      sessionData.user.email?.split("@")[0],
+                    avatar_url: sessionData.user.user_metadata?.avatar_url,
+                  });
+
+                if (insertError) {
+                  console.error(
+                    "[Google Auth] Profile creation error:",
+                    insertError
+                  );
+                } else {
+                  console.log("[Google Auth] Profile created successfully");
+                }
               }
             }
 
+            console.log("[Google Auth] ✅ Sign in successful!");
             return { success: true, user: sessionData.user };
+          } else {
+            console.warn("[Google Auth] No access token found in callback URL");
           }
+        } else if (result.type === "cancel") {
+          console.log("[Google Auth] User cancelled");
         }
 
         return { success: false, error: "Inicio de sesión cancelado" };
       }
 
+      console.warn("[Google Auth] No OAuth URL generated");
       return { success: false, error: "No se pudo iniciar la autenticación" };
     } catch (error: any) {
-      console.error("Google sign in error:", error);
+      console.error("[Google Auth] Exception:", error);
       return { success: false, error: error.message };
     }
   }

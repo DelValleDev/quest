@@ -91,6 +91,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   };
 
   const handleSocialAuth = async (provider: 'google' | 'apple') => {
+    console.log(`[AuthScreen] Starting ${provider} auth...`);
     setIsSocialLoading(provider);
     
     try {
@@ -98,19 +99,30 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
         ? await SocialAuth.signInWithGoogle()
         : await SocialAuth.signInWithApple();
       
+      console.log('[AuthScreen] Auth result:', { success: result.success, hasUser: !!result.user, error: result.error });
+      
       if (result.success && result.user) {
+        console.log('[AuthScreen] Getting current session...');
         // Get the current session after successful auth
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('[AuthScreen] Session retrieved:', !!session);
         if (session) {
           setSession(session);
+          console.log('[AuthScreen] Session set in store');
         }
+        console.log('[AuthScreen] Calling onAuthSuccess...');
         onAuthSuccess();
       } else if (result.error && !result.error.includes('cancelado')) {
+        console.warn('[AuthScreen] Auth error:', result.error);
         Alert.alert('Error', result.error);
+      } else {
+        console.log('[AuthScreen] Auth cancelled or no error');
       }
     } catch (error: any) {
+      console.error('[AuthScreen] Exception during auth:', error);
       Alert.alert('Error', error.message || 'An error occurred');
     } finally {
+      console.log('[AuthScreen] Clearing loading state');
       setIsSocialLoading(null);
     }
   };
