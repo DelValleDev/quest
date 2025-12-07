@@ -31,10 +31,23 @@
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.BODY_SENSORS",
-        "android.permission.ACTIVITY_RECOGNITION",
-        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.BODY_SENSORS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "quest",
+              "host": "*"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
