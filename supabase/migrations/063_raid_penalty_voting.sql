@@ -4,6 +4,13 @@
 -- Date: December 2025
 
 -- ===============================================
+-- DROP EXISTING TABLES (in case of partial migration)
+-- ===============================================
+DROP TABLE IF EXISTS raid_penalty_votes CASCADE;
+DROP TABLE IF EXISTS raid_penalty_proposals CASCADE;
+DROP TABLE IF EXISTS raid_winning_penalties CASCADE;
+
+-- ===============================================
 -- RAID PENALTY PROPOSALS
 -- ===============================================
 -- Propuestas de castigos creativos para el perdedor del raid

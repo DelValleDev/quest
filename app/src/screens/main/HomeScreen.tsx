@@ -703,6 +703,20 @@ export const HomeScreen: React.FC = () => {
         <Text style={styles.fabEmoji}>🤖</Text>
       </TouchableOpacity>
     </Animated.View>
+
+    {/* Penalty Notification Modal */}
+    <PenaltyNotification
+      visible={showPenaltyModal}
+      penalties={todayPenalties}
+      onClose={() => setShowPenaltyModal(false)}
+    />
+
+    {/* Quest AI Proactive Message Toast */}
+    <QuestAIToast 
+      message={aiMessage} 
+      onDismiss={() => setAiMessage(null)}
+      duration={4000}
+    />
   </View>
   );
 };
@@ -1074,20 +1088,3 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
 });
-
-      {/* Penalty Notification Modal */}
-      <PenaltyNotification
-        visible={showPenaltyModal}
-        penalties={todayPenalties}
-        onClose={() => setShowPenaltyModal(false)}
-      />
-
-      {/* Quest AI Proactive Message Toast */}
-      <QuestAIToast 
-        message={aiMessage} 
-        onDismiss={() => setAiMessage(null)}
-        duration={4000}
-      />
-    </View>
-  );
-};
