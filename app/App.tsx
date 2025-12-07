@@ -126,6 +126,7 @@ export default function App() {
 
   // Check if user has completed onboarding (assessment)
   const checkOnboardingStatus = async (userId: string) => {
+    console.log('[App] checkOnboardingStatus called for userId:', userId);
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -133,20 +134,25 @@ export default function App() {
         .eq('id', userId)
         .single();
       
+      console.log('[App] Profile data:', { data, error: error?.message });
+      
       if (error) throw error;
       
       // Check if initial setup (language, name, age) is done
       const setupDone = data?.initial_setup_completed === true;
       setNeedsInitialSetup(!setupDone);
+      console.log('[App] Setup status:', { setupDone, needsInitialSetup: !setupDone });
       
       // User is onboarded if they completed assessment (class is auto-assigned)
       const isComplete = data?.assessment_completed === true;
       setIsOnboarded(isComplete);
+      console.log('[App] Onboarding status:', { assessmentCompleted: isComplete, isOnboarded: isComplete });
     } catch (e) {
-      console.error('Error checking onboarding:', e);
+      console.error('[App] Error checking onboarding:', e);
       setNeedsInitialSetup(true);
       setIsOnboarded(false);
     } finally {
+      console.log('[App] Setting checkingOnboarding to false');
       setCheckingOnboarding(false);
     }
   };
@@ -211,10 +217,13 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
+        console.log('[App] onAuthStateChange fired:', { event: _event, hasSession: !!session, userId: session?.user?.id });
         setSession(session);
         if (session?.user) {
+          console.log('[App] Checking onboarding status for user:', session.user.id);
           checkOnboardingStatus(session.user.id);
         } else {
+          console.log('[App] No session, setting onboarded to false');
           setIsOnboarded(false);
           setCheckingOnboarding(false);
         }
