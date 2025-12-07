@@ -70,7 +70,9 @@
     "extra": {
       "eas": {
         "projectId": "e6e02aa9-4086-48e7-a286-bf5500c6e821"
-      }
+      },
+      "EXPO_PUBLIC_SUPABASE_URL": "https://umflvmfepxudsmfzgjkj.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtZmx2bWZlcHh1ZHNtZnpnamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzE3MjE5NDYsImV4cCI6MjA0NzI5Nzk0Nn0.KL2Mq54RGiUhM_Qs7M0Ks-uRvP5uTvANaMYqfZBE2hg"
     },
     "runtimeVersion": {
       "policy": "appVersion"
