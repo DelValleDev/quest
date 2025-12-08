@@ -1,0 +1,28 @@
+{
+  "name": "quest-fixing",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "expo start --tunnel",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "expo": "~54.0.27",
+    "expo-auth-session": "~7.0.10",
+    "expo-web-browser": "~15.0.10",
+    "expo-secure-store": "~15.0.8",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-url-polyfill": "^3.0.0",
+    "@supabase/supabase-js": "^2.86.0",
+    "@react-navigation/native": "^7.1.22",
+    "@react-navigation/native-stack": "^7.8.3",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2"
+  }
+}
