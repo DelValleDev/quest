@@ -1,18 +1,18 @@
 -- =====================================================
--- CLASSES SYSTEM
+-- SISTEMA DE CLASES
 -- Sistema de clases que determina el enfoque del usuario
 -- =====================================================
 
 -- =====================================================
--- CHARACTER CLASSES TABLE
+-- TABLA DE CLASES DE PERSONAJE
 -- =====================================================
 CREATE TABLE IF NOT EXISTS character_classes (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   icon TEXT NOT NULL,
   description TEXT NOT NULL,
-  primary_pillar TEXT NOT NULL, -- Main pillar focus
-  secondary_pillar TEXT, -- Secondary focus
+  primary_pillar TEXT NOT NULL, -- Pilar principal de enfoque
+  secondary_pillar TEXT, -- Enfoque secundario
   color TEXT NOT NULL,
   challenge_distribution JSONB NOT NULL DEFAULT '{"primary": 0.6, "secondary": 0.2, "others": 0.2}'
 );
